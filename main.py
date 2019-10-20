@@ -1,5 +1,15 @@
 #!/usr/bin/env python3.6
 
+"""
+This file contains various wrappers and functions that ease the code digestion and programming in general.
+    .. module:: main
+    :platform: linux
+
+.. moduleauthor:: Ivan Syzonenko <is2k@mtmail.mtsu.edu>
+"""
+__license__ = "MIT"
+__docformat__ = 'reStructuredText'
+
 import multiprocessing
 import os
 from GMDA_main import GMDA_main
@@ -8,8 +18,8 @@ from threaded_funcs import threaded_db_input, threaded_print  # ,threaded_copy, 
 
 
 def main():
-    """
-    This function is basically a launcher
+    """This function is basically a launcher
+
     Parallel threads did not result in a much better performance and was masked for better times.
     However, if you decide to implement C++ parallel I/O - it should help.
     """

@@ -1,24 +1,45 @@
-import multiprocessing
+"""This file contains functions executed in a separate process to reduce I/O.
+While I know that there is asyncio, but I believe that kernel can handle processes much better than Python.
+Additionally, you do not create context for a function during each call, but only once - during the initial call.
+
+    :platform: linux
+
+.. moduleauthor:: Ivan Syzonenko <is2k@mtmail.mtsu.edu>
+"""
+__license__ = "MIT"
+__docformat__ = 'reStructuredText'
+
+
+import multiprocessing as mp
 import os
 from shutil import copy2 as cp2
-
+from typing import NoReturn
 from db_proc import get_db_con
 
 
-def print_async(info_form_str, tup):
-    """
+def print_async(info_form_str: str, tup: tuple) -> NoReturn:
+    """Test function used for async printing
 
-    :param info_form_str:
-    :param tup:
+    Args:
+        :param str info_form_str: formatting string.
+        :param tuple tup: data to print.
+
+    Returns:
+    Simply prints the string.
     """
     print(info_form_str.format(*tup))
 
 
-def threaded_print(pipe):
-    """
-    Prints statement provided from the pipe.
+def threaded_print(pipe: mp.JoinableQueue) -> NoReturn:
+    """Prints statement provided from the pipe.
+
     Typically, you supply formating string and options
-    :param pipe:
+
+    Args:
+        :param mp.JoinableQueue pipe: source of the perforated strings and values (str, vals).
+
+    Returns:
+    Simply prints the string.
     """
     stmt = pipe.get(timeout=3600)
     while stmt is not None:
@@ -34,11 +55,15 @@ def threaded_print(pipe):
     print('Print thread exiting...')
 
 
-def threaded_db_input(pipe, len_seeds: int):
-    """
-    Runs DB operation in a separate process
-    :param pipe: connection with the parent
-    :param len_seeds: total number of seeds
+def threaded_db_input(pipe: mp.JoinableQueue, len_seeds: int) -> NoReturn:
+    """Runs DB operation in a separate process
+
+    Args:
+        :param pipe: connection with the parent.
+        :param len_seeds: total number of seeds.
+
+    Returns:
+    Executes the queries from the queue.
     """
     con, dbname = get_db_con(len_seeds)
     stmt = pipe.get(timeout=3600)
@@ -52,7 +77,7 @@ def threaded_db_input(pipe, len_seeds: int):
         # try:
         # con = con = lite.connect(dbname, timeout=3000, check_same_thread=False, isolation_level=None)
         # con.commit()
-        pid = multiprocessing.Process(target=stmt[0], args=(con,)+stmt[1])
+        pid = mp.Process(target=stmt[0], args=(con,)+stmt[1])
         pid.start()
         # except Exception as e:
         #     print('Found exception in db input:')
@@ -66,11 +91,14 @@ def threaded_db_input(pipe, len_seeds: int):
     con.close()
 
 
-def threaded_copy(pipe):
-    """
-    Recieves filenames (A, B) from the pipe and tries to copy A into B
-    :param pipe: connection with the parent
-    :return:
+def threaded_copy(pipe: mp.JoinableQueue) -> NoReturn:
+    """Recieves filenames (A, B) from the pipe and tries to copy A into B
+
+    Args:
+        :param pipe: connection with the parent
+
+    Returns:
+    Copies files in the background.
     """
     stmt = pipe.get(timeout=3600)
     while stmt is not None:
@@ -80,10 +108,14 @@ def threaded_copy(pipe):
         stmt = pipe.get(timeout=1800)
 
 
-def threaded_rm(pipe):
-    """
-    Recieves filename from the pipe and tries to remove them
-    :param pipe: connection with the parent
+def threaded_rm(pipe: mp.JoinableQueue) -> NoReturn:
+    """Recieves filename from the pipe and tries to remove them
+
+    Args:
+        :param pipe: connection with the parent
+
+    Returns:
+    Removes files in the background.
     """
     stmt = pipe.get(timeout=3600)
     while stmt is not None:

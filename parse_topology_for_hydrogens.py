@@ -1,9 +1,12 @@
 def parse_top_for_h(top_filename: str) -> list:
-    """
-    Reads the topology file and finds positions of the hydrogen atoms
-    :param top_filename: topology file .top
-    :return: list of hydrogen atoms position
-    :rtype: list
+    """Reads the topology file and finds positions of the hydrogen atoms
+
+    Args:
+        :param top_filename: topology file .top
+
+    Returns:
+        :return: list of hydrogen atoms position
+        :rtype: list
     """
     good_ind = list()
     with open(top_filename, 'r') as f:

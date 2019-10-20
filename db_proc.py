@@ -1,3 +1,13 @@
+"""
+This file contains DB related functions.
+.. module:: GMDA_main
+    :platform: linux
+
+.. moduleauthor:: Ivan Syzonenko <is2k@mtmail.mtsu.edu>
+"""
+__license__ = "MIT"
+__docformat__ = 'reStructuredText'
+
 import os
 import sqlite3 as lite
 import numpy as np
@@ -9,14 +19,20 @@ lite.register_adapter(np.float32, lambda val: float(val))
 from typing import NoReturn, Mapping, Sequence, List, Set
 
 
+def get_db_con(tot_seeds: int = 4) -> tuple:
+    """Creates the database with structure that fits exact number of seeds.
 
-def get_db_con(tot_seeds: int = 4):
-    """
-    Creates the database with structure that fits exact number of seeds.
     Filename for DB is generated as next number after the highest consequent found.
     If there is results_0.sqlite3, then next will be results_1.sqlite3 if it did not exist.
-    :param tot_seeds: number of seeds used in the current run
-    :return: database connection and name
+
+    Args:
+        :param int tot_seeds: number of seeds used in the current run
+        :type tot_seeds: int
+
+    Returns:
+        :return: database connection and name
+
+    Connection to the new database and it's name.
     """
     counter = 0
     # db_path = '/dev/shm/GMDApy'
@@ -108,12 +124,16 @@ def get_db_con(tot_seeds: int = 4):
     return con, db_name
 
 
-def log_error(con, type: str, id: int) -> NoReturn:
-    """
-    Writes an error message into the log table
-    :param con: current DB connection
-    :param type: error type
-    :param id: id associated with the error
+def log_error(con: lite.Connection, type: str, id: int) -> NoReturn:
+    """Writes an error message into the log table
+
+    Args:
+        :param con: current DB connection
+        :param type: error type
+        :param id: id associated with the error
+
+    Returns:
+    Adds one row in the log table.
     """
     qry = 'INSERT INTO log (id, operation, dst)  VALUES ({}, "ERROR", "{}")'.format(id, type)
     try:
@@ -135,12 +155,15 @@ def log_error(con, type: str, id: int) -> NoReturn:
 #     return num
 
 
-def get_id_for_hash(con, h_name: str) -> int:
-    """
-    Searches main storage for id with given hash
-    :param con: DB connection
-    :param h_name: hashname to use during the search
-    :return: id or None if not found
+def get_id_for_hash(con: lite.Connection, h_name: str) -> int:
+    """Searches main storage for id with given hash
+
+    Args:
+        :param lite.Connection con: DB connection
+        :param str h_name: hashname to use during the search
+
+    Returns:
+        :return: id or None if not found
     """
     con.commit()
     qry = "SELECT id FROM main_storage WHERE hashed_name='{}'".format(h_name)
@@ -156,14 +179,18 @@ def get_id_for_hash(con, h_name: str) -> int:
     return num
 
 
-def get_corr_vid_for_id(con, max_id: int, prev_ids, last_gc: float):
-    """
-    Used for recovery procedure. Tries to find matching sequence of nodes in the visited table
-    :param con: DB connection
-    :param max_id: maximum value of the id (defined by previous search as the common latest id)
-    :param prev_ids: several ids that should match
-    :param last_gc: extra check, whether greed counters also match
-    :return: last common visited id, timestamp, and id
+def get_corr_vid_for_id(con: lite.Connection, max_id: int, prev_ids: list, last_gc: float) -> tuple:
+    """Used for recovery procedure. Tries to find matching sequence of nodes in the visited table
+
+    Args:
+        :param lite.Connection con: DB connection
+        :param int max_id: maximum value of the id (defined by previous search as the common latest id)
+        :param list prev_ids: several ids that should match
+        :param float last_gc: extra check, whether greed counters also match
+
+    Returns:
+        :return: last common visited id, timestamp, and id
+        :rtype: tuple
     """
     qry = "SELECT vid, id, CAST(strftime('%s', Timestamp) AS INT), cur_gc FROM visited WHERE id<'{}' AND id in ({}, {}, {}) order by vid desc".format(max_id, prev_ids[0], prev_ids[1], prev_ids[2])
     cur = con.cursor()
@@ -185,14 +212,18 @@ def get_corr_vid_for_id(con, max_id: int, prev_ids, last_gc: float):
     return last_good_vid, last_good_ts, last_good_id
 
 
-def get_corr_lid_for_id(con, next_id: int, vid_ts: int, last_vis_id: int) -> int:
+def get_corr_lid_for_id(con: lite.Connection, next_id: int, vid_ts: int, last_vis_id: int) -> int:
     """
     Used for recovery procedure. Tries to find matching sequence of nodes in the log table
-    :param con: DB connection
-    :param next_id: next id we expect to see in the log, used for double check
-    :param vid_ts: visited timestampt
-    :param last_vis_id: last visited id
-    :return: the latest valid log_id
+
+    Args:
+        :param lite.Connection con: DB connection
+        :param int next_id: next id we expect to see in the log, used for double check
+        :param int vid_ts: visited timestampt
+        :param int last_vis_id: last visited id
+
+    Returns:
+        :return: the latest valid log_id
     """
     qry = "SELECT lid, CAST(strftime('%s', Timestamp) AS INT) FROM log WHERE id='{}' AND src='WQ' AND dst='VIZ' order by lid".format(last_vis_id)
     cur = con.cursor()
@@ -243,12 +274,15 @@ def get_corr_lid_for_id(con, next_id: int, vid_ts: int, last_vis_id: int) -> int
 #     return num
 
 
-def get_all_hashed_names(con) -> list:
-    """
-    Fetches all hashes from the main_storage
-    :param con: DB connection
-    :return: list of all hashes in the main_storage
-    :rtype: list
+def get_all_hashed_names(con: lite.Connection) -> list:
+    """Fetches all hashes from the main_storage
+
+    Args:
+        :param lite.Connection con: DB connection
+
+    Returns:
+        :return: list of all hashes in the main_storage
+        :rtype: list
     """
     qry = "SELECT hashed_name FROM main_storage order by id desc"
     cur = con.cursor()
@@ -257,14 +291,18 @@ def get_all_hashed_names(con) -> list:
     return rows
 
 
-def insert_into_main_stor(con, node_info: dict, curr_gc: int, digest_name: str, name: str) -> NoReturn:
-    """
-    Inserts main information into the DB.
-    :param con: DB connection
-    :param node_info: all metric values associated with the node
-    :param curr_gc: current greedy counter
-    :param digest_name: hash name for the path, same as filenames for MD simulations
-    :param name: path from the origin separated by _
+def insert_into_main_stor(con: lite.Connection, node_info: dict, curr_gc: int, digest_name: str, name: str) -> NoReturn:
+    """Inserts main information into the DB.
+
+    Args:
+        :param lite.Connection con: DB connection
+        :param dict node_info: all metric values associated with the node
+        :param int curr_gc: current greedy counter
+        :param str digest_name: hash name for the path, same as filenames for MD simulations
+        :param str name: path from the origin separated by _
+
+    Returns:
+    Stores data in the DB in a main_storage table.
     """
     # con = lite.connect('results_8.sqlite3', timeout=300, check_same_thread=False, isolation_level=None)
     # qry = "INSERT OR IGNORE INTO main_storage(rmsd_goal_dist, rmsd_prev_dist, rmsd_tot_dist, angl_goal_dist,
@@ -300,13 +338,17 @@ def insert_into_main_stor(con, node_info: dict, curr_gc: int, digest_name: str, 
         print('Error element message: ', e, '\nqry: ', node_info, curr_gc, digest_name, name)
 
 
-def insert_into_visited(con, hname: str, gc: int) -> NoReturn:
+def insert_into_visited(con: lite.Connection, hname: str, gc: int) -> NoReturn:
     """
     Inserts node processing event.
-    :param con: DB connection
-    :param hname: hashname, same as MD filenames
-    :param gc: greedy counter
-    :return:
+
+    Args:
+        :param lite.Connection con: DB connection
+        :param str hname: hashname, same as MD filenames
+        :param int gc: greedy counter
+
+    Returns:
+    Stores data in the DB in a visited table.
     """
     nid = get_id_for_hash(con, hname)
     qry = 'INSERT INTO visited( id, cur_gc ) VALUES (?, ?)'
@@ -319,21 +361,25 @@ def insert_into_visited(con, hname: str, gc: int) -> NoReturn:
         log_error(con, 'VIZ', nid)
 
 
-def insert_into_log(con, operation: str, hname: str, src: str, dst: str, bsf: list, gc: int, mul: float, prev_arr: list,
+def insert_into_log(con: lite.Connection, operation: str, hname: str, src: str, dst: str, bsf: list, gc: int, mul: float, prev_arr: list,
                     goal_arr: list, cur_metr_name: str) -> NoReturn:
-    """
-    Inserts various information, like new best_so_far events, insertions into the open queue, etc
-    :param con: DB connection
-    :param operation: result, current, prom_O, skip
-    :param hname: hash name, same as MD filenames
-    :param src: from WQ (open queue)
-    :param dst: to VIZ (visited)
-    :param bsf: all best_so_far values for each metric
-    :param gc: greedy counter - affects events like seed change
-    :param mul: greedy multiplier - controls greediness
-    :param prev_arr: distance from the previous node
-    :param goal_arr: distance to the goal
-    :param cur_metr_name: name of the current metric
+    """Inserts various information, like new best_so_far events, insertions into the open queue, etc.
+
+    Args:
+        :param lite.Connection con: DB connection
+        :param str operation: result, current, prom_O, skip
+        :param str hname: hash name, same as MD filenames
+        :param str src: from WQ (open queue)
+        :param str dst: to VIZ (visited)
+        :param list bsf: all best_so_far values for each metric
+        :param int gc: greedy counter - affects events like seed change
+        :param float mul: greedy multiplier - controls greediness
+        :param list prev_arr: distance from the previous node
+        :param list goal_arr: distance to the goal
+        :param str cur_metr_name: name of the current metric
+
+    Returns:
+    Stores data in the DB in a log table.
     """
     src = 'None' if src == '' else src
     dst = 'None' if dst == '' else dst
@@ -390,12 +436,16 @@ def insert_into_log(con, operation: str, hname: str, src: str, dst: str, bsf: li
 
 
 def copy_old_db(main_dict_keys: list, last_visited: list, next_in_oq: str, last_gc: float) -> NoReturn:
-    """
-    Used during the recovery procedure
-    :param main_dict_keys: all hash values from the main_dict - storage of all metric information
-    :param last_visited: several (3) recent values from the visited queue
-    :param next_in_oq: next hash (id) in the open queue, used for double check
-    :param last_gc: last greedy counter observed in the information from the pickle
+    """Used during the recovery procedure.
+
+    Args:
+        :param list main_dict_keys: all hash values from the main_dict - storage of all metric information
+        :param list last_visited: several (3) recent values from the visited queue
+        :param str next_in_oq: next hash (id) in the open queue, used for double check
+        :param float last_gc: last greedy counter observed in the information from the pickle
+
+    Returns:
+    Conditionally copies data from the previous DB into a new one as a part of the restore process.
     """
     counter = 0
     db_path = os.getcwd()

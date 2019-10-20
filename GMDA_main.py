@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
 
+"""
+This file contains main computational loop and functions highly related to it
+.. module:: GMDA_main
+    :platform: linux
+
+.. moduleauthor:: Ivan Syzonenko <is2k@mtmail.mtsu.edu>
+"""
+__license__ = "MIT"
+__docformat__ = 'reStructuredText'
+
 import heapq
 import time
 import os
@@ -10,6 +20,7 @@ from pathlib import Path
 import zlib
 import gc
 
+from typing import NoReturn
 
 from db_proc import insert_into_log, insert_into_main_stor, insert_into_visited, copy_old_db
 from helper_funcs import trjcat_many, make_a_step, create_core_mapping, get_seed_dirs, check_precomputed_noize, \
@@ -152,16 +163,20 @@ MAX_ITEMS_TO_HANDLE = 50000
 #     return True
 
 
-def queue_rebuild(process_queue, open_queue_to_rebuild, node_info, cur_mult: float, new_metr_name: str, sep_proc: bool = True):
-    """
+def queue_rebuild(process_queue: list, open_queue_to_rebuild: list, node_info: dict, cur_mult: float, new_metr_name: str, sep_proc: bool = True) -> list:
+    """Resorts the queue according to the new metric.
 
-    :param process_queue: queue to use if function is executed in a separate process
-    :param open_queue_to_rebuild: sorted queue that contains nodes about to be processed. This is actually only a partial queue (only top elements)
-    :param node_info:
-    :param cur_mult: current greedy factor
-    :param new_metr_name: defines how to sort the new queue
-    :param sep_proc: whether the function runs in a separate process
-    :return: if separate process - then new queue and metric name are pushed into the queue, otherwise returned
+    Args:
+        :param list process_queue: queue to use if function is executed in a separate process
+        :param list open_queue_to_rebuild: sorted queue that contains nodes about to be processed. This is actually only a partial queue (only top elements)
+        :param dict node_info:
+        :param float cur_mult: current greedy factor
+        :param str new_metr_name: defines how to sort the new queue
+        :param bool sep_proc: whether the function runs in a separate process
+
+    Returns:
+        :return: if separate process - then new queue and metric name are pushed into the queue, otherwise returned
+        :rtype: list
     """
     gc.collect()
     new_queue = list()
@@ -184,11 +199,14 @@ def queue_rebuild(process_queue, open_queue_to_rebuild, node_info, cur_mult: flo
 
 
 def get_atom_num(ndx_file: str) -> int:
-    """
-    Computes number of atoms in the particular index file
-    :param ndx_file: .ndx - index of the protein atoms of the current conformation
-    :return: number of atoms in the .ndx file
-    :rtype: integer
+    """Computes number of atoms in the particular index file.
+
+    Args:
+        :param str ndx_file: .ndx - index of the protein atoms of the current conformation.
+
+    Returns:
+        :return: number of atoms in the .ndx file.
+        :rtype: int
     """
     with open(ndx_file, 'r') as index_file:
         index_file.readline()  # first line is the comment - skip it
@@ -198,12 +216,15 @@ def get_atom_num(ndx_file: str) -> int:
     return atom_num
 
 
-def parse_hostnames(seednum: int, hostfile: str = 'hostfile'):
-    """
-    Spreads the load among the hosts found in the hostfile. Needed for MPI
-    :param seednum: total number of seeds used in the current run
-    :param hostfile: filename of the hostfile
-    :return: hosts split partitioned according to the number of seeds and total number of cores for each job
+def parse_hostnames(seednum: int, hostfile: str = 'hostfile') -> tuple:
+    """Spreads the load among the hosts found in the hostfile. Needed for MPI
+
+    Args:
+        :param seednum: total number of seeds used in the current run
+        :param hostfile: filename of the hostfile
+
+    Returns:
+        :return: hosts split partitioned according to the number of seeds and total number of cores for each job
     """
     with open(hostfile, 'r') as f:
         hosts = f.readlines()
@@ -220,9 +241,9 @@ def parse_hostnames(seednum: int, hostfile: str = 'hostfile'):
 
 
 def compute_on_local_machine(cpu_map: list, seed_list: list, cur_name: str, past_dir: str, work_dir: str, seed_dirs: dict,
-                             topol_file_init: str, ndx_file_init: str, prev_runs_files: list, old_name_digest: str):
-    """
-    This version is optimised for usage on one machine with tMPI (see GROMACS docs).
+                             topol_file_init: str, ndx_file_init: str, prev_runs_files: list, old_name_digest: str) -> tuple:
+    """This version is optimised for usage on one machine with tMPI (see GROMACS docs).
+
     Performs check whether requested simulation was completed in the past.
     If so (and all requested files exist), we skip the computation,
     otherwise we start the sequence of events that prepare and run the simulation in the separate process.
@@ -230,17 +251,24 @@ def compute_on_local_machine(cpu_map: list, seed_list: list, cur_name: str, past
     What I know fo sure that powers of 2 work the best until 128 cores, but we do not have so many cores on one machine.
     Two machines are worse than one (yes, 64+64 is slower than 64, same with 32+32) - maybe Infiniband can help, but we do not have one.
     Additionally, I commented prev_runs - it just uses more RAM without giving any significant speedup.
-    :param cpu_map: number of cores for particular task (seed)
-    :param seed_list: list of current seeds
-    :param cur_name: name of the current node (prior path constructed from seed names s_0_1_4)
-    :param past_dir: path to the directory with prior computations
-    :param work_dir: path to the directory where seed dirs reside
-    :param seed_dirs: dict which contains physical path to the directory where simulation with particular seed is performed
-    :param topol_file_init: .top - topology of the initial (unfolded) conformation
-    :param ndx_file_init: .ndx - index of the protein atoms of the unfolded conformation
-    :param prev_runs_files: information about all previously generated files in ./past directory
-    :param old_name_digest: digest of the current name
-    :return: array of PIDs to join them later and allow some more parallel computation, hash names, simulation names.
+
+    Args:
+        :param list cpu_map: number of cores for particular task (seed)
+        :param list seed_list: list of current seeds
+        :param str cur_name: name of the current node (prior path constructed from seed names s_0_1_4)
+        :param str past_dir: path to the directory with prior computations
+        :param str work_dir: path to the directory where seed dirs reside
+        :param dict seed_dirs: dict which contains physical path to the directory where simulation with particular seed is performed
+        :param str topol_file_init: .top - topology of the initial (unfolded) conformation
+        :param str ndx_file_init: .ndx - index of the protein atoms of the unfolded conformation
+        :param list prev_runs_files: information about all previously generated files in ./past directory
+        :param str old_name_digest: digest of the current name
+
+    Returns:
+        :return: array of PIDs to join them later and allow some more parallel computation, hash names, simulation names.
+        :rtype: tuple
+
+    Returns: PIDs and new filenames. PIDs - to join processes later.
     """
     files_for_trjcat = list()
     recent_filenames = list()
@@ -314,9 +342,9 @@ def compute_on_local_machine(cpu_map: list, seed_list: list, cur_name: str, past
 
 def compute_with_mpi(seed_list: list, cur_name: str, past_dir: str, work_dir: str, seed_dirs: dict, topol_file_init: str,
                      ndx_file_init: str, prev_runs_files: list, old_name_digest: str, tot_seeds: int, hostnames: list,
-                     ncores: list, sched: bool = False, ntomp: int = 1):
-    """
-    This version is optimised for usage on more than one machine with tMPI and/or MPI.
+                     ncores: list, sched: bool = False, ntomp: int = 1) -> tuple:
+    """This version is optimised for usage on more than one machine with tMPI and/or MPI.
+
     If you use scheduler and know exactly how many cores each machine has - supply correct hostfile and use tMPI on each machine with OMP.
     If you use scheduler without option to choose specific machine - use version without scheduler or local version (depends on your cluster implementation).
     Performs check whether requested simulation was completed in the past.
@@ -326,21 +354,28 @@ def compute_with_mpi(seed_list: list, cur_name: str, past_dir: str, work_dir: st
     What I know fo sure that powers of 2 work the best until 128 cores, but we do not have so many cores on one machine.
     Two machines are worse than one (yes, 64+64 is slower than 64, same with 32+32) - maybe InfiniBand can help, but we do not have one.
     Additionally, I commented prev_runs - it just uses more RAM without giving any significant speedup.
-    :param seed_list: list of current seeds
-    :param cur_name: name of the current node (prior path constructed from seed names s_0_1_4)
-    :param past_dir: path to the directory with prior computations
-    :param work_dir: path to the directory where seed dirs reside
-    :param seed_dirs: dict which contains physical path to the directory where simulation with particular seed is performed
-    :param topol_file_init:  .top - topology of the initial (unfolded) conformation
-    :param ndx_file_init: .ndx - index of the protein atoms of the initial (unfolded) conformation
-    :param prev_runs_files: information about all previously generated files in ./past directory
-    :param old_name_digest: digest of the current name
-    :param tot_seeds: total number of seeds, controversial optimisation.
-    :param hostnames: correct names/IPs of the hosts
-    :param ncores: number of cores on each host
-    :param sched: secelts proper make_a_step version
-    :param ntomp: how many OMP threads use during the MD simulation (2-4 is the optimal value on 32-64 core hosts)
-    :return: array of PIDs to join them later and allow some more parallel computation, hash names, simulation names.
+
+    Args:
+        :param list seed_list: list of current seeds
+        :param str cur_name: name of the current node (prior path constructed from seed names s_0_1_4)
+        :param str past_dir: path to the directory with prior computations
+        :param strwork_dir: path to the directory where seed dirs reside
+        :param dict seed_dirs: dict which contains physical path to the directory where simulation with particular seed is performed
+        :param str topol_file_init:  .top - topology of the initial (unfolded) conformation
+        :param str ndx_file_init: .ndx - index of the protein atoms of the initial (unfolded) conformation
+        :param list prev_runs_files: information about all previously generated files in ./past directory
+        :param str old_name_digest: digest of the current name
+        :param int tot_seeds: total number of seeds, controversial optimisation.
+        :param list hostnames: correct names/IPs of the hosts
+        :param int ncores: number of cores on each host
+        :param bool sched: secelts proper make_a_step version
+        :param int ntomp: how many OMP threads use during the MD simulation (2-4 is the optimal value on 32-64 core hosts)
+
+    Returns:
+        :return: array of PIDs to join them later and allow some more parallel computation, hash names, simulation names.
+        :rtype: tuple
+
+    PIDs and new filenames. PIDs - to join processes later.
     """
     # if os.path.exists(os.path.join(os.getcwd(), 'local.comp')):
     #     hostnames = [('Perseus', )]*tot_seeds
@@ -386,12 +421,15 @@ def compute_with_mpi(seed_list: list, cur_name: str, past_dir: str, work_dir: st
 
 
 def check_in_queue(queue: list, elem_hash: str) -> bool:
-    """
-    Checks whether elements with provided hash exists in the queue
-    :param queue: specific queue to check
-    :param elem_hash: name to find in the queue
-    :return: True if element found, False otherwise
-    :rtype: bool
+    """Checks whether elements with provided hash exists in the queue
+
+    Args:
+        :param list queue: specific queue to check
+        :param str elem_hash: name to find in the queue
+
+    Returns:
+        :return: True if element found, False otherwise
+        :rtype: bool
     """
     for elem in queue:
         if elem[2] == elem_hash:
@@ -400,23 +438,28 @@ def check_in_queue(queue: list, elem_hash: str) -> bool:
 
 
 def second_chance(open_queue: list, visited_queue: list, best_so_far_name: str, cur_metric: str, main_dict: dict,
-                  node_max_att: int, cur_metric_name: str, best_so_far: str, tol_error: float, greed_mult: float):
-    """
-    Typically executed during the seed change.
+                  node_max_att: int, cur_metric_name: str, best_so_far: str, tol_error: float, greed_mult: float) -> list:
+    """Typically executed during the seed change.
+
     We want to give the second chance to a promising trajectories with different seeds. Typically, we allow up to 4 attempts.
     However, the best trajectories are always readded to the queue.
-    :param open_queue: sorted queue that contains nodes about to be processed. This is actually only a partial queue (only top elements)
-    :param visited_queue: sorted queue that contains nodes  processed prior. This is actually only a partial queue (only top elements)
-    :param best_so_far_name: node with the closest distance to the goal according to the guiding metric - we want to keep it for a long time, with hope that it will jump over the energy barrier
-    :param cur_metric: index of the current metric
-    :param main_dict: map with all the information (prior and goal distances for all metrics, names, hashnames, attempts, etc)
-    :param node_max_att: defines how many attempts each node can have
-    :param cur_metric_name: name of the current metric
-    :param best_so_far: name of the node with the closest metric distance to the goal
-    :param tol_error: minimal metric vibration of the NMR structure
-    :param greed_mult: greedy multiplier, used to assign correct metric value (ballance between optimality and greedyness)
-    :return: short list of promising nodes, they will be merged with the open queue later
-    :rtype: list
+
+    Args:
+        :param list open_queue: sorted queue that contains nodes about to be processed. This is actually only a partial queue (only top elements)
+        :param list visited_queue: sorted queue that contains nodes  processed prior. This is actually only a partial queue (only top elements)
+        :param str best_so_far_name: node with the closest distance to the goal according to
+        the guiding metric - we want to keep it for a long time, with hope that it will jump over the energy barrier
+        :param str cur_metric: index of the current metric
+        :param dict main_dict: map with all the information (prior and goal distances for all metrics, names, hashnames, attempts, etc)
+        :param int node_max_att: defines how many attempts each node can have
+        :param str cur_metric_name: name of the current metric
+        :param str best_so_far: name of the node with the closest metric distance to the goal
+        :param float tol_error: minimal metric vibration of the NMR structure
+        :param float greed_mult: greedy multiplier, used to assign correct metric value (ballance between optimality and greedyness)
+
+    Returns:
+        :return: short list of promising nodes, they will be merged with the open queue later
+        :rtype: list
     """
 
     res_arr = list()
@@ -455,13 +498,19 @@ def second_chance(open_queue: list, visited_queue: list, best_so_far_name: str, 
     return res_arr
 
 
-def check_dupl(name_to_check, visited_queue):
+def check_dupl(name_to_check: str, visited_queue: list) -> list:
     """
-    This function is just a detector of duplicates. Main source of dupplicates is when the algorithme gives the second chance to the same seed, but does not use it.
+    This function is just a detector of duplicates.
+
+    Main source of dupplicates is when the algorithme gives the second chance to the same seed, but does not use it.
     This function checks whether specific name was used recently
-    :param name_to_check: name that is about to be sampled
-    :param visited_queue: all previously used names
-    :return: True if name was used recently, otherwise False
+
+    Args:
+        :param name_to_check: name that is about to be sampled
+        :param visited_queue: all previously used names
+
+    Returns:
+        :return: True if name was used recently, otherwise False
     """
     arr = [name[2] for name in visited_queue]
     if name_to_check in arr:
@@ -470,22 +519,29 @@ def check_dupl(name_to_check, visited_queue):
     return False
 
 
-def GMDA_main(prev_runs_files, past_dir: str, print_queue, db_input_queue, copy_queue, rm_queue, tot_seeds=4):
-    """
-    This is the main loop.
+def GMDA_main(prev_runs_files: list, past_dir: str, print_queue: mp.JoinableQueue,
+              db_input_queue: mp.JoinableQueue, copy_queue: mp.JoinableQueue, rm_queue: mp.JoinableQueue, tot_seeds: int = 4) -> NoReturn:
+    """This is the main loop.
+
     Note that it has many garbage collector calls - it can slightly reduce the performance, but also reduces total memory usage.
     Feel free to comment them - they do not affect the algorithm
-    :param prev_runs_files: you may see this as the list of files found before the execution.
-     We do not use it anymore to reduce the memory footprint.
-     Instead we check existence of the file separately.
-    :param past_dir: location of all generated .gro, .xtc, metric values. Sequence of past seeds results in the unique name.
-    :param print_queue: separate thread for printing operations, connected to the main process by Queue.
-     It helps significantly during the restart without the previously saved state: you can query DB faster without waiting for printing operations to complete.
-    :param db_input_queue:
-    :param copy_queue: connection to the separate process that handled async copy. Should be rewriten with asyncio
-    :param rm_queue: connection to the separate process that handled async rm. Should be rewriten with asyncio
-    :param tot_seeds: number of parallel seeds to be executed - very powerful knob
-    :return: Nothing, once stop condition is reached, looping stops and returns to the parent to join/clean other threads
+
+    Args:
+        :param list prev_runs_files you may see this as the list of files found before the execution.
+         We do not use it anymore to reduce the memory footprint.
+         Instead we check existence of the file separately.
+        :param str past_dir: location of all generated .gro, .xtc, metric values. Sequence of past seeds results in the unique name.
+        :type past_dir: str
+        :param mp.JoinableQueue print_queue: separate thread for printing operations, connected to the main process by Queue.
+         It helps significantly during the restart without the previously saved state:
+         you can query DB faster without waiting for printing operations to complete.
+        :param mp.JoinableQueue db_input_queue:
+        :param mp.JoinableQueue copy_queue: connection to the separate process that handled async copy. Should be rewriten with asyncio
+        :param mp.JoinableQueue rm_queue: connection to the separate process that handled async rm. Should be rewriten with asyncio
+        :param int tot_seeds: number of parallel seeds to be executed - very powerful knob
+
+    Returns:
+        :return: Nothing, once stop condition is reached, looping stops and returns to the parent to join/clean other threads
     """
     # prev_runs_files = None  # temp action - trying to save memory
     print('Main process rebuild_queue_process: ', os.getpid())

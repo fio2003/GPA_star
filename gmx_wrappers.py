@@ -1,3 +1,12 @@
+"""
+This file contains GROMACS wrappers.
+    :platform: linux
+
+.. moduleauthor:: Ivan Syzonenko <is2k@mtmail.mtsu.edu>
+"""
+__license__ = "MIT"
+__docformat__ = 'reStructuredText'
+
 import subprocess
 import multiprocessing
 import os
@@ -10,30 +19,43 @@ os.environ.update(my_env)
 
 
 def convert_gro_to_xtc(gro_file: str, ndx_file: str) -> str:
-    """
-    Converts .gro into .xtc format
-    :param gro_file: input filename
-    :param ndx_file: index file, shows which atoms to store in .xtc
-    :return: .xtc filename
+    """Converts .gro into .xtc format. Just a wrapper around trjconv.
+
+    Args:
+        :param str gro_file: input filename
+        :param str ndx_file: index file, shows which atoms to store in .xtc
+
+    Returns:
+        :return: .xtc filename
     """
     out_filename = gro_file[0:-3] + 'xtc'
     gmx_trjconv(f=gro_file, o=out_filename, n=ndx_file)
     return out_filename
 
 
-def gmx_trjconv(f: str, o: str, n: str = None, s: str = None, b: int = None, e: int = None, dump: int = None, fit: str = None, vel: str = None, pbc: str = None) -> NoReturn:
-    """
-    'gmx trjconv' - GROMACS tool - converts trajectory files in many ways
-    :param f: Input trajectory: xtc trr cpt gro g96 pdb tng
-    :param o: Output trajectory: xtc trr gro g96 pdb tng
-    :param n: Index file
-    :param s: Structure+mass(db): tpr gro g96 pdb brk ent
-    :param b: Time of first frame to read from trajectory (default unit ps)
-    :param e: Time of last frame to read from trajectory (default unit ps)
-    :param dump: Dump frame nearest specified time (ps)
-    :param fit: Fit molecule to ref structure in the structure file: none, rot+trans, rotxy+transxy, translation, transxy, progressive
-    :param vel: Read and write velocities if possible
-    :param pbc: PBC treatment (see help text for full description): none, mol, res, atom, nojump, cluster, whole
+def gmx_trjconv(f: str, o: str, n: str = None, s: str = None, b: int = None, e: int = None,
+                dump: int = None, fit: str = None, vel: str = None, pbc: str = None) -> NoReturn:
+    """'gmx trjconv' - GROMACS tool - converts trajectory files in many ways
+
+    Converts between various formats. In our case from .gro to .xtc or
+     from .gro to .gro with specific index file to filter protein only or it's specific parts.
+
+    Args:
+        :param str f: Input trajectory: xtc trr cpt gro g96 pdb tng
+        :param str o: Output trajectory: xtc trr gro g96 pdb tng
+        :param str n: Index file
+        :param str s: Structure+mass(db): tpr gro g96 pdb brk ent
+        :param int b: Time of first frame to read from trajectory (default unit ps)
+        :param int e: Time of last frame to read from trajectory (default unit ps)
+        :param int dump: Dump frame nearest specified time (ps)
+        :param str fit: Fit molecule to ref structure in the structure
+        file: none, rot+trans, rotxy+transxy, translation, transxy, progressive
+        :param str vel: Read and write velocities if possible
+        :param str pbc: PBC treatment (see help text for full description):
+        none, mol, res, atom, nojump, cluster, whole
+
+    Returns:
+    Generates one output file passed with -o parameter.
     """
     if not (f and o):
         raise Exception('Missing in/out arguments.')
@@ -72,16 +94,22 @@ def gmx_trjconv(f: str, o: str, n: str = None, s: str = None, b: int = None, e: 
     # print(error)
 
 
-def gmx_trjcat(f: str, o: str, n: str, cat=True, vel=False, sort=False, overwrite=True) -> NoReturn:
-    """
-    'gmx trjcat' - GROMACS tool - concatenates several input trajectory files in sorted order
-    :param f: Input trajectory: xtc trr cpt gro g96 pdb tng
-    :param o: Output trajectory: xtc trr gro g96 pdb tng
-    :param n: Index file
-    :param cat: Do not discard double time frames
-    :param vel: Read and write velocities if possible
-    :param sort: Sort trajectory files (not frames)
-    :param overwrite: Overwrite overlapping frames during appending
+def gmx_trjcat(f: str, o: str, n: str, cat: bool = True, vel: bool = False, sort: bool = False, overwrite: bool = True) -> NoReturn:
+    """'gmx trjcat' - GROMACS tool - concatenates several input trajectory files in sorted order
+
+    Outputs one .xtc file that contains all frames (99% frames are NOT sorted, since trajectories have the same time)
+
+    Args:
+        :param str f: Input trajectory: xtc trr cpt gro g96 pdb tng
+        :param str o: Output trajectory: xtc trr gro g96 pdb tng
+        :param str n: Index file
+        :param bool cat: Do not discard double time frames
+        :param bool vel: Read and write velocities if possible
+        :param bool sort: Sort trajectory files (not frames)
+        :param bool overwrite: Overwrite overlapping frames during appending
+
+    Returns:
+    Generates one output file passed with -o parameter.
     """
     command_trjcat = 'gmx trjcat -keeplast '
     if not (f and o):
@@ -117,10 +145,16 @@ def gmx_trjcat(f: str, o: str, n: str, cat=True, vel=False, sort=False, overwrit
 
 
 def gmx_eneconv(f: str, o: str) -> NoReturn:
-    """
-    'gmx eneconv' - GROMACS tool - Concatenates several energy files in sorted order
-    :param f: Input trajectory: xtc trr cpt gro g96 pdb tng
-    :param o: Output trajectory: xtc trr gro g96 pdb tng
+    """'gmx eneconv' - GROMACS tool - Concatenates several energy files in sorted order
+
+    Stores converted energy files. Not used by main algorithm, but during the postprocessing.
+
+    Args:
+        :param str f: Input trajectory: xtc trr cpt gro g96 pdb tng
+        :param str o: Output trajectory: xtc trr gro g96 pdb tng
+
+    Returns:
+    Generates one output energy file passed with -o parameter.
     """
     command_eneconv = 'gmx eneconv '
     if not (f and o):
@@ -142,15 +176,19 @@ def gmx_eneconv(f: str, o: str) -> NoReturn:
         print(error)
 
 
-def gmx_energy(f: str, o: str, w=None, w_prog=None, fee: bool = True, fetemp: float = 300) -> NoReturn:
-    """
-    'gmx trjconv' - GROMACS tool - extracts energy components from an energy file
-    :param f: .edr Energy file
-    :param o: energy.xvg - xvgr/xmgr file
-    :param w: View output .xvg, .xpm, .eps and .pdb files
-    :param w_prog: viewing programm
-    :param fee: Do a free energy estimate
-    :param fetemp: Reference temperature for free energy calculation
+def gmx_energy(f: str, o: str, w: bool = None, w_prog: str = None, fee: bool = True, fetemp: float = 300) -> NoReturn:
+    """'gmx trjconv' - GROMACS tool - extracts energy components from an energy file
+
+    Args:
+        :param str f: .edr Energy file
+        :param str o: energy.xvg - xvgr/xmgr file
+        :param str w: View output .xvg, .xpm, .eps and .pdb files
+        :param str w_prog: viewing programm
+        :param bool fee: Do a free energy estimate
+        :param float fetemp: Reference temperature for free energy calculation
+
+    Returns:
+    Generates one output .xvg file passed with -o parameter.
     """
     command_energy = 'gmx energy '
     command_energy += ' -f ' + f
@@ -170,14 +208,18 @@ def gmx_energy(f: str, o: str, w=None, w_prog=None, fee: bool = True, fetemp: fl
         print(error)
 
 
-def gmx_mdrun(work_dir, seed, new_name, ncores=multiprocessing.cpu_count(), thread_type='nt') -> NoReturn:
-    """
-    gmx mdrun - Local version.
-    :param work_dir: path to work directory, where all seed directories reside
-    :param seed: seed value used in the MD simulation
-    :param new_name: output name for a final state
-    :param ncores: number of cores to use in the current simulation
-    :param thread_type: thread type: MPI ? OMP ? TMPI ?
+def gmx_mdrun(work_dir: str, seed: int, new_name: str, ncores: int = multiprocessing.cpu_count(), thread_type: str = 'nt') -> NoReturn:
+    """gmx mdrun - localhost version.
+
+    Args:
+        :param str work_dir: path to work directory, where all seed directories reside
+        :param int seed: seed value used in the MD simulation
+        :param str new_name: output name for a final state
+        :param int ncores: number of cores to use in the current simulation
+        :param str thread_type: thread type: MPI ? OMP ? TMPI ?
+
+    Returns:
+    Starts a shell in a separate process and runs mdrun there.
     """
     if thread_type not in ['nt', 'ntomp']:  # 'ntmpi' is prohibited when gromacs compiled without mpi support
         raise Exception('Wrong thread type passed in gmx_mdrun')
@@ -198,14 +240,20 @@ def gmx_mdrun(work_dir, seed, new_name, ncores=multiprocessing.cpu_count(), thre
         print(error)
 
 
-def gmx_mdrun_mpi(work_dir, seed, new_name, hostnames, ncores=None, thread_type='ntomp') -> NoReturn:
-    """
-    gmx mdrun - MPI version
-    :param work_dir: path to work directory, where all seed directories reside
-    :param seed: seed value used in the MD simulation
-    :param new_name: output name for a final state
-    :param hostnames: must be a list
-    :param ncores: number of cores to use in the current simulation
+def gmx_mdrun_mpi(work_dir: str, seed: int, new_name: str, hostnames: list, ncores: list = None, thread_type: str = 'ntomp') -> NoReturn:
+    """gmx mdrun - MPI version
+
+    Args:
+        :param str work_dir: path to work directory, where all seed directories reside
+        :param int seed: seed value used in the MD simulation
+        :param str new_name: output name for a final state
+        :param list hostnames: must be a list
+        :param list ncores: number of cores to use in the current simulation
+        :param str thread_type: type of the thread, OMP ? MPI ?
+
+    Returns:
+    Starts a shell in a separate process and runs mdrun there.
+    This version uses MPI to run on a separate host
     """
     if thread_type not in ['ntmpi', 'ntomp']:  # 'nt' is prohibited when gromacs compiled with mpi support
         raise Exception('Wrong thread type passed in gmx_mdrun')
@@ -234,14 +282,20 @@ def gmx_mdrun_mpi(work_dir, seed, new_name, hostnames, ncores=None, thread_type=
         print(error)
 
 
-def gmx_mdrun_mpi_with_sched(work_dir, seed, new_name, ncores=None, ntomp=1) -> NoReturn:
-    """
-    gmx mdrun - MPI version with scheduler
-    :param work_dir: path to work directory, where all seed directories reside
-    :param seed: seed value used in the MD simulation
-    :param new_name: output name for a final state
-    :param hostnames: must be a list
-    :param ncores: number of cores to use in the current simulation
+def gmx_mdrun_mpi_with_sched(work_dir: str, seed: int, new_name: str, ncores: list = None, ntomp: int = 1) -> NoReturn:
+    """gmx mdrun - MPI version with scheduler
+
+    Args:
+        :param str work_dir: path to work directory, where all seed directories reside
+        :param int seed: seed value used in the MD simulation
+        :param str new_name: output name for a final state
+        :param list ncores: number of cores to use in the current simulation
+        :param int ntomp: number of OMP threads
+
+    Returns:
+    Starts a shell in a separate process and runs mdrun there.
+    This version uses MPI but does not specify the host, it should be done through the scheduler.
+    Do not use this version if you know the exact host names - then you have more control and potentially less overhead.
     """
     if ncores % ntomp != 0 or (ntomp > ncores):
         raise Exception('Not possible to divide OMP threads evenly among the specified number of cores.\nCores: {}\tOMP threads: {}\n'.format(ncores, ntomp))
@@ -264,13 +318,20 @@ def gmx_mdrun_mpi_with_sched(work_dir, seed, new_name, ncores=None, ntomp=1) -> 
         print(error)
 
 
-def gmx_grompp(work_dir, seed, top_file, prev_name) -> NoReturn:
-    """
-    gmx grompp (the gromacs preprocessor) reads a molecular topology file, checks the validity of the file, expands the topology from a molecular description to an atomic description.
-    :param work_dir: path to work directory, where all seed directories reside
-    :param seed: seed value used in the MD simulation
-    :param top_file: .top - topology of the conformation
-    :param prev_name: previous simulation digest. Used as starting point.
+def gmx_grompp(work_dir: str, seed: int, top_file: str, prev_name: str) -> NoReturn:
+    """gmx grompp (the gromacs preprocessor) reads a molecular topology file, checks the validity of the file,
+     expands the topology from a molecular description to an atomic description.
+
+    Args::
+    
+        :param str work_dir: path to work directory, where all seed directories reside
+        :param int seed: seed value used in the MD simulation
+        :param str top_file: .top - topology of the conformation
+        :param str prev_name: previous simulation digest. Used as starting point.
+
+    Returns
+    
+    Creates .tpr - binary config file.
     """
     command_prep_run = "gmx grompp -f md.mdp -c {}.gro -p {} -o md.tpr".format(prev_name, top_file)
     proc_obj = subprocess.Popen(command_prep_run, stdout=-1, shell=True, cwd=os.path.join(work_dir, str(seed)), stderr=-1, env=my_env)

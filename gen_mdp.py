@@ -1,12 +1,24 @@
+"""
+This file contains only one function that generates configuration for the MD simulation.
+    :platform: linux
+
+.. moduleauthor:: Ivan Syzonenko <is2k@mtmail.mtsu.edu>
+"""
+__license__ = "MIT"
+__docformat__ = 'reStructuredText'
+
 
 def get_mdp(seed: int, temp: int, name: str = 'default') -> str:
-    """
-    Generates text for .mdf file with simulation settings
-    :param seed: seed to be used for initial velocities generation
-    :param temp: temperature of the experiment
-    :param name: name of the experiment inside the .mdp file
-    :return: string with .mdp text
-    :rtype: str
+    """Generates text for .mdp file with simulation settings
+
+    Args:
+        :param int seed: seed to be used for initial velocities generation
+        :param int temp: temperature of the experiment
+        :param str name: name of the experiment inside the .mdp file
+
+    Returns:
+        :return: string with .mdp text
+        :rtype: str
     """
     calibration_mdp = "\
 ; Run parameters\n\

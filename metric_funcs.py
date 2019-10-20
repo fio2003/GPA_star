@@ -1,3 +1,14 @@
+"""This file contains functions to compute various metric distances.
+
+.. module:: GMDA_main
+    :platform: linux
+
+.. moduleauthor:: Ivan Syzonenko <is2k@mtmail.mtsu.edu>
+"""
+__license__ = "MIT"
+__docformat__ = 'reStructuredText'
+
+
 import numpy as np
 import os
 import subprocess
@@ -13,13 +24,16 @@ from gmx_wrappers import gmx_grompp, gmx_mdrun, gmx_trjcat, gmx_trjconv, gmx_mdr
 
 
 def get_knn_dist_mdsctk(ref_file: str, fitfile: str, topology: str) -> list:
-    """
-    'knn_rms' - MDSCTK tool - computes RMSD between two (or more) structures
-    :param ref_file: reference file - .xtc or .gro filename
-    :param fitfile: .xtc or .gro filename - structure will be centered according to the fitfile and used in distance computation
-    :param topology: .top topology file of the simulation box
-    :return: list of RMSD distances from all frames to the goal
-    :rtype: list
+    """'knn_rms' - MDSCTK tool - computes RMSD between two (or more) structures
+
+    Args:
+        :param str ref_file: reference file - .xtc or .gro filename
+        :param str fitfile: .xtc or .gro filename - structure will be centered according to the fitfile and used in distance computation
+        :param str topology: .top topology file of the simulation box
+
+    Returns:
+        :return: list of RMSD distances from all frames to the goal
+        :rtype: list
     """
     if os.path.exists(os.path.join(os.getcwd(), 'local.comp')):
         mdsctk_bash = 'source /opt/mdsctk/MDSCTK.bash ; '  # need this since load_envbash does not work
@@ -49,14 +63,18 @@ def get_knn_dist_mdsctk(ref_file: str, fitfile: str, topology: str) -> list:
 
 
 def get_contat_profile_mdsctk(ref_file: str, fitfile: str, index: str, dist: float = 2.7) -> np.ndarray:
-    """
-    'contact_profile' - MDSCTK tool - computes number of contacts between two (or more) structures
-    :param ref_file: reference file - .xtc or .gro filename
-    :param fitfile: .xtc or .gro filename - structure will be centered according to the fitfile and used in distance computation
-    :param index: .ndx file to compute distance among particular atoms
-    :param dist: in Angstroms - how close should two atoms be, so treat them as a contact
-    :return: ndarray, first value - number of indices with contacts, next N indices are atoms with contact
-    :rtype np.ndarray
+    """'contact_profile' - MDSCTK tool - computes number of contacts between two (or more) structures
+
+    Args:
+        :param str ref_file: reference file - .xtc or .gro filename
+        :param str fitfile: .xtc or .gro filename - structure will be centered according
+         to the fitfile and used in distance computation
+        :param str index: .ndx file to compute distance among particular atoms
+        :param floatdist: in Angstroms - how close should two atoms be, so treat them as a contact
+
+    Returns:
+        :return: ndarray, first value - number of indices with contacts, next N indices are atoms with contact
+        :rtype np.ndarray
     """
     if os.path.exists(os.path.join(os.getcwd(), 'local.comp')):
         mdsctk_bash = 'source /opt/mdsctk/MDSCTK.bash ; '  # need this since load_envbash does not work
@@ -95,10 +113,14 @@ def get_contat_profile_mdsctk(ref_file: str, fitfile: str, index: str, dist: flo
 
 
 def get_bb_to_angle_mdsctk(x: str = 'noise_bb.xtc', o: str = 'noise_angle.dat') -> NoReturn:
-    """
-    'bb_xtc_to_phipsi' - MDSCTK tool - takes backbone structure and computes dihedral angles between atoms
-    :param x: backbone input trajectory
-    :param o: filename of the binary C array
+    """'bb_xtc_to_phipsi' - MDSCTK tool - takes backbone structure and computes dihedral angles between atoms
+
+    Args:
+        :param str x: backbone input trajectory
+        :param str o: filename of the binary C array
+
+    Returns:
+    Generates a file with dihedral angles.
     """
     if os.path.exists(os.path.join(os.getcwd(), 'local.comp')):
         mdsctk_bash = 'source /opt/mdsctk/MDSCTK.bash ; '  # need this since load_envbash does not work
@@ -129,10 +151,14 @@ def get_bb_to_angle_mdsctk(x: str = 'noise_bb.xtc', o: str = 'noise_angle.dat') 
 
 
 def get_angle_to_sincos_mdsctk(i: str='noise_angle.dat', o: str='noise_sincos.dat') -> NoReturn:
-    """
-    'angles_to_sincos' - MDSCTK tool - converts dihedrals into sin/cos values
-    :param i: filename that contains angle values in the  binary form
-    :param o: filename that contains sin/cos values in the  binary form
+    """'angles_to_sincos' - MDSCTK tool - converts dihedrals into sin/cos values
+
+    Args:
+        :param str i: filename that contains angle values in the  binary form
+        :param str o: filename that contains sin/cos values in the  binary form
+
+    Returns:
+    Generates file with sin/cos values.
     """
     if os.path.exists(os.path.join(os.getcwd(), 'local.comp')):
         mdsctk_bash = 'source /opt/mdsctk/MDSCTK.bash ; '  # need this since load_envbash does not work
@@ -162,19 +188,25 @@ def get_angle_to_sincos_mdsctk(i: str='noise_angle.dat', o: str='noise_sincos.da
             print(output)
 
 
-def gen_file_for_amb_noize(work_dir: str, seeds: int, seed_dirs: dict, ndx_file: str, top_file: str, goal_file: str = 'folded_for_noise.gro', hostnames: list = None, cpu_map: list = None) -> str:
-    """
-    Performs simulation of the NMR (not unfolded) conformation to measure ambient vibrations
-    :param work_dir: path to the working directory
-    :param seeds: number of seed in the current run
-    :param seed_dirs: paths to directories where emulation is performed with particular seed
-    :param ndx_file: index file to extract only specific atoms (strip water)
-    :param top_file: .top topology file of the simulation box
-    :param goal_file: goal (typically NMR) conformation
-    :param hostnames: for MPI, to perform parallel computation
-    :param cpu_map: number of cores for particular task (seed)
-    :return: filename which contains all seed simulations concatenated
-    :rtype: str
+def gen_file_for_amb_noize(work_dir: str, seeds: int, seed_dirs: dict, ndx_file: str, top_file: str,
+                           goal_file: str = 'folded_for_noise.gro', hostnames: list = None, cpu_map: list = None) -> str:
+    """Performs simulation of the NMR (not unfolded) conformation to measure ambient vibrations
+
+    Args:
+        :param str work_dir: path to the working directory
+        :param int seeds: number of seed in the current run
+        :param dict seed_dirs: paths to directories where emulation is performed with particular seed
+        :param str ndx_file: index file to extract only specific atoms (strip water)
+        :param str top_file: .top topology file of the simulation box
+        :param str goal_file: goal (typically NMR) conformation
+        :param list hostnames: for MPI, to perform parallel computation
+        :param listcpu_map: number of cores for particular task (seed)
+
+    Returns:
+        :return: filename which contains all seed simulations concatenated
+        :rtype: str
+
+    Generates a file with trajectories from the goal.
     """
     # if file ambient.rmsd found, read it
 
@@ -241,14 +273,18 @@ def gen_file_for_amb_noize(work_dir: str, seeds: int, seed_dirs: dict, ndx_file:
 #     return float(np.min(res_arr)*mul)
 
 
-def compute_phipsi_angles(angl_num: int, target_filename: str, ndx: str, stor_name=None):
-    """
+def compute_phipsi_angles(angl_num: int, target_filename: str, ndx: str, stor_name: str = None) -> np.ndarray:
+    """Top level function that outputs sin/cos of the dihedral angles of the provided conformation.
 
-    :param angl_num: total number of angles in the protein
-    :param target_filename:
-    :param ndx:
-    :param stor_name:
-    :return:
+    Args:
+        :param int angl_num: total number of angles in the protein
+        :param str target_filename:
+        :param str ndx: index file to extract only specific atoms (extract the backbone)
+        :param str stor_name:
+
+    Returns:
+        :return: array with sin/cos values of the backbone angles.
+        :rtype: np.ndarray
     """
     xtc_filename = "{}.xtc".format(target_filename)
     if stor_name is None:  # then create temp file in /dev/shm
@@ -277,12 +313,16 @@ def compute_phipsi_angles(angl_num: int, target_filename: str, ndx: str, stor_na
     return check_arr
 
 
-def ang_dist(target_ang: list, goal_ang: list):
-    """
-    Computes difference between two angle lists.
-    :param target_ang: angles to test
-    :param goal_ang: goal angles
-    :return: one number when input is a list or list of sums in case intput is list of lists
+def ang_dist(target_ang: list, goal_ang: list) -> np.ndarray:
+    """Computes difference between two angle lists.
+
+    Args:
+        :param list target_ang: angles to test
+        :param list goal_ang: goal angles
+
+    Returns:
+        :return: one number when input is a list or list of sums in case intput is list of lists
+        :rtype: np.ndarray
     """
     if target_ang.shape[0] == 1 or target_ang.ndim == 1:
         return np.abs(target_ang - goal_ang).sum()
@@ -304,35 +344,45 @@ def ang_dist(target_ang: list, goal_ang: list):
 
 
 def save_an_file(an_file_name: str, tol_error: dict, metr_order: list) -> NoReturn:
-    """
-    Writes noise values into the specified file for future use during the restarts
-    :param an_file_name: ambient noise filename
-    :param tol_error: dict with ambient noise values for each metric
-    :param metr_order: list of metrics used in the current run
+    """Writes noise values into the specified file for future use during the restarts
+
+    Args:
+        :param str an_file_name: ambient noise filename
+        :param dict tol_error: dict with ambient noise values for each metric
+        :param list metr_order: list of metrics used in the current run
+
+    Returns:
+    Generates a file with noise values.
     """
     with open(an_file_name, 'w') as f:
         for metr_name in metr_order:
             f.write('{}\n'.format(tol_error[metr_name]))
 
 
-def get_native_contacts(goal_prot_only: str, files_to_check: list, ndx_file: str, cont_corr: np.ndarray, atom_num: int, dist: float = 2.7, logic_fun: np.ufunc = np.logical_xor,
-                        h_filter: list = None, pool: mp.Pool = None, just_contacts: bool = False):  # goal_prot_only, files_for_trjcat, ndx_file
-    """
-    Computes number of contacts between the goal_prot_only and files_to_check.
+def get_native_contacts(goal_prot_only: str, files_to_check: list, ndx_file: str, cont_corr: np.ndarray, atom_num: int,
+                        dist: float = 2.7, logic_fun: np.ufunc = np.logical_xor, h_filter: list = None,
+                        pool: mp.Pool = None, just_contacts: bool = False) -> tuple:  # goal_prot_only, files_for_trjcat, ndx_file
+    """Computes number of contacts between the goal_prot_only and files_to_check.
+
     If files to check is a single list of contacts, then function returns int and list
     Otherwise it returns list of ints and list of lists
-    :type logic_fun: Numpy logic function, typically logical_xor or logical_and
-    :param goal_prot_only: .gro filename with stripped waters and salt
-    :param files_to_check: .xtc filename with frames we want to measure number of contacts with the goal
-    :param ndx_file: .ndx - index filename to select protein only in .xtc
-    :param cont_corr: correct contacts between goal and goal (no mistakes) to compare with the files_to_check
-    :param atom_num: number of atoms used for memory (structure) allocation
-    :param dist: distance that defines a contact
-    :param logic_fun: defines what relation between the goal and the files_to_check we want to measure - AND, XOR
-    :param h_filter: boolean array with 1s in positions of H atoms, used to filter the final contacts
-    :param pool: CPU pool - passed, since each instance does not deallocate the RAM
-    :param just_contacts: flags to skip computation of the sum of correct contacts
-    :return: sum of the correct contacts and contacts.
+
+    Args:
+        :param str goal_prot_only: .gro filename with stripped waters and salt
+        :param list files_to_check: .xtc filename with frames we want to measure number of contacts with the goal
+        :param str ndx_file: .ndx - index filename to select protein only in .xtc
+        :param np.ndarray cont_corr: correct contacts between goal and goal (no mistakes) to compare with the files_to_check
+        :param int atom_num: number of atoms used for memory (structure) allocation
+        :param dist: distance that defines a contact
+        :param np.ufunc logic_fun: defines what relation between the goal and the files_to_check we want to measure - AND, XOR
+        :type logic_fun: Numpy logic function, typically logical_xor or logical_and
+        :param list h_filter: boolean array with 1s in positions of H atoms, used to filter the final contacts
+        :param mp.Pool pool: CPU pool - passed, since each instance does not deallocate the RAM
+        :param bool just_contacts: flags to skip computation of the sum of correct contacts
+
+    Returns:
+        :return: sum of the correct contacts and contacts.
+        :rtype: tuple
     """
     # nat_cont_arr = list()
     # contacts = list()
@@ -385,16 +435,20 @@ def get_native_contacts(goal_prot_only: str, files_to_check: list, ndx_file: str
 
 
 def and_h(q: mp.Queue, goal_contacts_and_h_sum: np.int, goal_cont_h: list, contacts_h: list, prev_contacts_h: list, and_h_dist_tot: np.int) -> NoReturn:
-    """
-    Separate AND_H computation, used to be executed in parallel,
+    """Separate AND_H computation, used to be executed in parallel,
+
     NOT used anymore since does not result in any significant speed up, but left here "just in case".
-    :param q: queue used to communicate with the parent process
-    :param goal_contacts_and_h_sum: exact number of NMR contacts
-    :param goal_cont_h: correct (NMR) contacts
-    :param contacts_h: current nodes' contacts
-    :param prev_contacts_h: previous node contacts
-    :param and_h_dist_tot: distance accumulated from the origin
-    :return: Returns by putting into the queue (metric to goal, metric from previous, total traveled in metric units).
+
+    Args:
+        :param mp.Queue q: queue used to communicate with the parent process
+        :param np.int goal_contacts_and_h_sum: exact number of NMR contacts
+        :param list goal_cont_h: correct (NMR) contacts
+        :param list contacts_h: current nodes' contacts
+        :param list prev_contacts_h: previous node contacts
+        :param np.int and_h_dist_tot: distance accumulated from the origin
+
+    Returns:
+        :return: Returns by putting into the queue (metric to goal, metric from previous, total traveled in metric units).
     """
     goal_cont_dist_and_h = goal_contacts_and_h_sum - [np.logical_and(arr_elem, goal_cont_h).sum() for arr_elem in contacts_h]
     prev_cont_dist_and_h_1 = [np.logical_xor(arr_elem, prev_contacts_h).sum() for arr_elem in contacts_h]
@@ -406,16 +460,20 @@ def and_h(q: mp.Queue, goal_contacts_and_h_sum: np.int, goal_cont_h: list, conta
 
 
 def and_p(q: mp.Queue, goal_contacts_and_sum: np.int, goal_contacts: list, contacts: list, prev_contacts: list, prev_tot_dist: np.int) -> NoReturn:
-    """
-    Separate AND computation, used to be executed in parallel,
+    """Separate AND computation, used to be executed in parallel,
+
     NOT used anymore since does not result in any significant speed up, but left here "just in case".
-    :param q: queue used to communicate with the parent process
-    :param goal_contacts_and_sum: exact number of NMR contacts
-    :param goal_contacts: correct (NMR) contacts
-    :param contacts: current nodes' contacts
-    :param prev_contacts: previous node contacts
-    :param prev_tot_dist: distance accumulated from the origin
-    :return: Returns by putting into the queue (metric to goal, metric from previous, total traveled in metric units).
+
+    Args:
+        :param mp.Queue q: queue used to communicate with the parent process
+        :param np.int goal_contacts_and_sum: exact number of NMR contacts
+        :param list goal_contacts: correct (NMR) contacts
+        :param list contacts: current nodes' contacts
+        :param list prev_contacts: previous node contacts
+        :param np.int prev_tot_dist: distance accumulated from the origin
+
+    Returns:
+        :return: Returns by putting into the queue (metric to goal, metric from previous, total traveled in metric units).
     """
     goal_cont_dist_and = goal_contacts_and_sum - [np.logical_and(arr_elem, goal_contacts).sum() for arr_elem in contacts]
     prev_cont_dist_and_1 = [np.logical_xor(arr_elem, prev_contacts).sum() for arr_elem in contacts]
@@ -427,15 +485,19 @@ def and_p(q: mp.Queue, goal_contacts_and_sum: np.int, goal_contacts: list, conta
 
 
 def rmsd(q: mp.Queue, combined_pg: str, temp_xtc_file: str, goal_prot_only: str, prev_tot_dist: np.float64) -> NoReturn:
-    """
-    Separate RMSD computation, used to be executed in parallel,
+    """Separate RMSD computation, used to be executed in parallel,
+
     NOT used anymore since does not result in any significant speed up, but left here "just in case".
-    :param q: queue used to communicate with the parent process
-    :param combined_pg: two frames previous and goal
-    :param temp_xtc_file: new frames (same as number of seeds) you want to measure distance from previous and to the goal
-    :param goal_prot_only: goal protein only conformation
-    :param prev_tot_dist: distance accumulated from the origin
-    :return: Returns by putting into the queue (metric to goal, metric from previous, total traveled in metric units).
+
+    Args:
+        :param mp.Queue q: queue used to communicate with the parent process
+        :param str combined_pg: two frames previous and goal
+        :param str temp_xtc_file: new frames (same as number of seeds) you want to measure distance from previous and to the goal
+        :param str goal_prot_only: goal protein only conformation
+        :param np.float64 rev_tot_dist: distance accumulated from the origin
+
+    Returns:
+        :return: Returns by putting into the queue (metric to goal, metric from previous, total traveled in metric units).
     """
     dist_arr = get_knn_dist_mdsctk(combined_pg, temp_xtc_file, goal_prot_only)
     from_prev_dist = dist_arr[0::2]
@@ -445,17 +507,21 @@ def rmsd(q: mp.Queue, combined_pg: str, temp_xtc_file: str, goal_prot_only: str,
 
 
 def angl(q: mp.Queue, angl_num: int, temp_xtc_file: str, init_bb_ndx: str, pangl: list, goal_angles: list, prev_tot_dist: np.float64) -> NoReturn:
-    """
-    Separate ANGL computation, used to be executed in parallel,
+    """Separate ANGL computation, used to be executed in parallel,
+
     NOT used anymore since does not result in any significant speed up, but left here "just in case".
-    :param q: queue used to communicate with the parent process
-    :param angl_num: total number of angles in the protein
-    :param temp_xtc_file: new frames (same as number of seeds) you want to measure distance from previous and to the goal
-    :param init_bb_ndx: .ndx to extract the backbone atoms
-    :param pangl: previous node angles
-    :param goal_angles: correct angles (NMR angles)
-    :param prev_tot_dist: distance accumulated from the origin
-    :return: Returns by putting into the queue (metric to goal, metric from previous, total traveled in metric units).
+
+    Args:
+        :param mp.Queue q: queue used to communicate with the parent process
+        :param int angl_num: total number of angles in the protein
+        :param str temp_xtc_file: new frames (same as number of seeds) you want to measure distance from previous and to the goal
+        :param str init_bb_ndx: .ndx to extract the backbone atoms
+        :param list pangl: previous node angles
+        :param list goal_angles: correct angles (NMR angles)
+        :param np.float64 prev_tot_dist: distance accumulated from the origin
+
+    Returns:
+        :return: Returns by putting into the queue (metric to goal, metric from previous, total traveled in metric units).
     """
     cur_angles = compute_phipsi_angles(angl_num, temp_xtc_file.split('.')[0], init_bb_ndx)
     angl_sum_from_prev = ang_dist(cur_angles, pangl)
@@ -467,36 +533,41 @@ def angl(q: mp.Queue, angl_num: int, temp_xtc_file: str, init_bb_ndx: str, pangl
 def compute_metric(past_dir: str, new_nodes_names: list, tot_seeds: int, combined_pg: str, temp_xtc_file: str, goal_prot_only: str, node_info: dict, angl_num: int,
                    init_bb_ndx: str, goal_angles: list, init_prot_only: str, files_for_trjcat: list, ndx_file_init: str, goal_cont_h: list, atom_num: int,
                    cont_dist: float, h_filter_init: list, goal_contacts: list, cur_metric: int, goal_contacts_and_h_sum: np.int, goal_contacts_and_sum: np.int,
-                   chance_to_reuse: bool = False, cpu_pool: mp.Pool = None, compute_all_at_once: bool = True):
-    """
-    Computes metric distances from the previous node and to the goal (NMR) conformation
+                   chance_to_reuse: bool = False, cpu_pool: mp.Pool = None, compute_all_at_once: bool = True) -> list:
+    """Computes metric distances from the previous node and to the goal (NMR) conformation.
+
     Before I was computing metrics separately, but computing them all at once add very little overhead
      and allows to track trajectory behavior, so later I fixed only the code with all at once option.
-    :param past_dir: path to the directory with prior computation results
-    :param new_nodes_names: full names of newly computed nodes (not current)
-    :param tot_seeds: total number of seed in the current run
-    :param combined_pg: previous and goal frames combined into one trajectory
-    :param temp_xtc_file: new nodes' final frames
-    :param goal_prot_only: NMR (folded) conformation without water and salt (protein only)
-    :param node_info: info about the current node (not just computed, but rather previous)
-    :param angl_num: number of dihedral angles in the protein
-    :param init_bb_ndx: index file with backbone atom positions for the initial conformation
-    :param goal_angles: angle values of the NMR structure
-    :param init_prot_only: initial (unfolded) conformation without water and salt (protein only)
-    :param files_for_trjcat: list of newly computed nodes (files, with hash as a name)
-    :param ndx_file_init: index file with backbone atom positions for the NMR conformation
-    :param goal_cont_h: contact values of the NMR structure (hydrogens only)
-    :param atom_num: total number of atoms in the protein (same for folded and unfolded)
-    :param cont_dist: distance between atoms treated as 'contact'
-    :param h_filter_init: positions of the hydrogen atoms in the initial (unfolded) conformation
-    :param goal_contacts: list of correct contacts in the NMR (folded) conformation
-    :param cur_metric: metric index
-    :param goal_contacts_and_h_sum: total sum of the contacts between hydrogents in the NMR (folded) conformation
-    :param goal_contacts_and_sum: total sum of the contacts in the NMR (folded) conformation
-    :param chance_to_reuse:
-    :param cpu_pool: CPU pool for local parallel processing
-    :param compute_all_at_once: toggle whether to compute all metrics at the same time or not (yes, if no check the code)
-    :return: new nodes with all metrics (compute_all_at_once only) and current metric distances
+
+    Args:
+        :param str past_dir: path to the directory with prior computation results
+        :param list new_nodes_names: full names of newly computed nodes (not current)
+        :param int tot_seeds: total number of seed in the current run
+        :param str combined_pg: previous and goal frames combined into one trajectory
+        :param str temp_xtc_file: new nodes' final frames
+        :param str goal_prot_only: NMR (folded) conformation without water and salt (protein only)
+        :param dict node_info: info about the current node (not just computed, but rather previous)
+        :param int angl_num: number of dihedral angles in the protein
+        :param str init_bb_ndx: index file with backbone atom positions for the initial conformation
+        :param list goal_angles: angle values of the NMR structure
+        :param str init_prot_only: initial (unfolded) conformation without water and salt (protein only)
+        :param list files_for_trjcat: list of newly computed nodes (files, with hash as a name)
+        :param str ndx_file_init: index file with backbone atom positions for the NMR conformation
+        :param list goal_cont_h: contact values of the NMR structure (hydrogens only)
+        :param int atom_num: total number of atoms in the protein (same for folded and unfolded)
+        :param float cont_dist: distance between atoms treated as 'contact'
+        :param list h_filter_init: positions of the hydrogen atoms in the initial (unfolded) conformation
+        :param list goal_contacts: list of correct contacts in the NMR (folded) conformation
+        :param int cur_metric: metric index
+        :param np.int goal_contacts_and_h_sum: total sum of the contacts between hydrogents in the NMR (folded) conformation
+        :param np.int goal_contacts_and_sum: total sum of the contacts in the NMR (folded) conformation
+        :param bool chance_to_reuse:
+        :param mp.Pool cpu_pool: CPU pool for local parallel processing
+        :param bool compute_all_at_once: toggle whether to compute all metrics at the same time or not (yes, if no check the code)
+
+    Returns:
+        :return: new nodes with all metrics (compute_all_at_once only) and current metric distances
+        :rtype: list
     """
     # global extra_past
     new_nodes = [None] * tot_seeds
@@ -573,15 +644,15 @@ def compute_metric(past_dir: str, new_nodes_names: list, tot_seeds: int, combine
 
         # *********  ANG ************
         reusing_old_angl = False
-        if chance_to_reuse:
-            try:
-                cur_angles = [np.fromfile(os.path.join(past_dir, '{}.angl'.format(digests[i])), dtype=np.float32) for i in range(tot_seeds)]
-                cur_angles = np.asarray(cur_angles, dtype=np.float32)
-                reusing_old_angl = True
-            except OSError:
-                cur_angles = compute_phipsi_angles(angl_num, temp_xtc_file.split('.')[0], init_bb_ndx)
-        else:
+        # if chance_to_reuse:
+        try:
+            cur_angles = [np.fromfile(os.path.join(past_dir, '{}.angl'.format(digests[i])), dtype=np.float32) for i in range(tot_seeds)]
+            cur_angles = np.asarray(cur_angles, dtype=np.float32)
+            reusing_old_angl = True
+        except OSError:
             cur_angles = compute_phipsi_angles(angl_num, temp_xtc_file.split('.')[0], init_bb_ndx)
+        # else:
+        #     cur_angles = compute_phipsi_angles(angl_num, temp_xtc_file.split('.')[0], init_bb_ndx)
 
         # angl_sum_from_prev = ang_dist(cur_angles, node_info['angles'])
         # if os.path.exists(os.path.join(past_dir, '{}.angl'.format(node_info['digest_name']))):
@@ -760,28 +831,32 @@ def compute_init_metric(past_dir: str, tot_seeds: int, init_xtc: str, goal_xtc: 
                         init_bb_ndx: str, goal_angles: np.ndarray, init_prot_only: str, ndx_file_init: str,
                         goal_cont_h: np.ndarray, atom_num: int, cont_dist: float, h_filter_init: np.ndarray,
                         goal_contacts: np.ndarray, goal_contacts_and_h_sum: np.int64, goal_contacts_and_sum: np.int64) -> list:
-    """
-    Special case of the "compute_metric"
+    """Special case of the "compute_metric"
+
     Computes metric distances to the goal (NMR) conformation and sets previous distances to 0
-    :param past_dir: path to the directory with prior computation results
-    :param tot_seeds: total number of seed in the current run
-    :param init_xtc: initial (unfolded) conformation with water and salt
-    :param goal_xtc: NMR (folded) conformation with water and salt
-    :param goal_prot_only: NMR (folded) conformation without water and salt (protein only)
-    :param angl_num: number of dihedral angles in the protein
-    :param init_bb_ndx: index file with backbone atom positions for the initial conformation
-    :param goal_angles: angle values of the NMR structure
-    :param init_prot_only: initial (unfolded) conformation without water and salt (protein only)
-    :param ndx_file_init: index file with backbone atom positions for the NMR conformation
-    :param goal_cont_h: contact values of the NMR structure (hydrogens only)
-    :param atom_num: total number of atoms in the protein (same for folded and unfolded)
-    :param cont_dist: distance between atoms treated as 'contact'
-    :param h_filter_init: positions of the hydrogen atoms in the initial (unfolded) conformation
-    :param goal_contacts: list of correct contacts in the NMR (folded) conformation
-    :param goal_contacts_and_h_sum: total sum of the contacts between hydrogents in the NMR (folded) conformation
-    :param goal_contacts_and_sum: total sum of the contacts in the NMR (folded) conformation
-    :return: node structure with the initial metrics
-    :rtype: list
+
+    Args:
+        :param str past_dir: path to the directory with prior computation results
+        :param int tot_seeds: total number of seed in the current run
+        :param str init_xtc: initial (unfolded) conformation with water and salt
+        :paramstr  goal_xtc: NMR (folded) conformation with water and salt
+        :param str goal_prot_only: NMR (folded) conformation without water and salt (protein only)
+        :param int angl_num: number of dihedral angles in the protein
+        :param str init_bb_ndx: index file with backbone atom positions for the initial conformation
+        :param np.ndarray goal_angles: angle values of the NMR structure
+        :param str init_prot_only: initial (unfolded) conformation without water and salt (protein only)
+        :param str ndx_file_init: index file with backbone atom positions for the NMR conformation
+        :param np.ndarray goal_cont_h: contact values of the NMR structure (hydrogens only)
+        :param int atom_num: total number of atoms in the protein (same for folded and unfolded)
+        :param float cont_dist: distance between atoms treated as 'contact'
+        :param np.ndarray h_filter_init: positions of the hydrogen atoms in the initial (unfolded) conformation
+        :param np.ndarray goal_contacts: list of correct contacts in the NMR (folded) conformation
+        :param np.int64 goal_contacts_and_h_sum: total sum of the contacts between hydrogents in the NMR (folded) conformation
+        :param np.int64 goal_contacts_and_sum: total sum of the contacts in the NMR (folded) conformation
+
+    Returns:
+        :return: node structure with the initial metrics
+        :rtype: list
     """
     init_node = [None] * tot_seeds
     dim = 1 if tot_seeds > 1 else 0
@@ -849,19 +924,25 @@ def compute_init_metric(past_dir: str, tot_seeds: int, init_xtc: str, goal_xtc: 
     return init_node
 
 
-def select_metrics_by_snr(cur_nodes: list, prev_node: dict, metric_names: list, tol_error: dict, compute_all_at_once: bool, alowed_metrics: list, cur_metr: str):
-    """
-    SNR approach to metric selection: metrics that had the highest SNR ratio (metric distance from the prev point)/(ambient noise) is selected next
+def select_metrics_by_snr(cur_nodes: list, prev_node: dict, metric_names: list, tol_error: dict,
+                          compute_all_at_once: bool, alowed_metrics: list, cur_metr: str) -> str:
+    """SNR approach to a metric selection.
+
+    Metrics that had the highest SNR ratio (metric distance from the prev point)/(ambient noise) is selected next
     However, this approach does not always work and while you may a high SNR with contacts, there may be no real decrease in the rmsd.
     It is affected by the previous point performance.
-    :param cur_nodes: recent nodes
-    :param prev_node: previous node
-    :param metric_names: list of metrics implemented (I want to know whole statistics, not only allowed metrics)
-    :param tol_error: dict with noise data
-    :param compute_all_at_once: toggle left as a reminder to not implement all at once
-    :param alowed_metrics: list of metrics that we allow to be used during the current run
-    :param cur_metr: name of the current metric
-    :return: metric name with the highest SNR
+
+    Args:
+        :param list cur_nodes: recent nodes
+        :param dict prev_node: previous node
+        :param list metric_names: list of metrics implemented (I want to know whole statistics, not only allowed metrics)
+        :param dict tol_error: dict with noise data
+        :param bool compute_all_at_once: toggle left as a reminder to not implement all at once
+        :param list alowed_metrics: list of metrics that we allow to be used during the current run
+        :param str cur_metr: name of the current metric
+
+    Returns:
+        :return: metric name with the highest SNR
     """
     if not compute_all_at_once:
         # easy to implement, but I do not have plans to use it since 'all at once' is very fast

@@ -38,7 +38,21 @@ def main():
 
 
 
-def build_best_traj(metr_name, db_to_connect):
+def build_best_traj(metr_name: str, db_to_connect: str):
+    """Finds the lowest value of the metric and builds the trajectory that leads to this point.
+
+    Once best value is found, we search for a name, parse it (name consist of prev seeds separated by _).
+    Once we have all the preceeding seeds, we can extract their frames and join them.
+
+Parameters
+----------
+        :param str metr_name:
+        :param str db_to_connect:
+
+Returns
+-------
+    Generates one .xtc trajectory with frames that result in the best conformation according to the specific metric.
+    """
 
     # db_to_connect = 'results_opls_trp_300_2_fixed'
 
@@ -122,10 +136,13 @@ if __name__ == '__main__':
     main()
 
 
-
-
-
 def main_energy():
+    """
+
+Returns
+-------
+    Generates one .edr trajectory with energy of the frames that result in the best conformation according to the specific metric.
+    """
     past_dir = './past'
     db_to_connect = 'results_12'
     polynomial = False
