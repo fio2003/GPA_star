@@ -55,34 +55,36 @@ def main():
     # rm_thread.start()
 
     # prev_runs_files = get_previous_runs_info(past_dir)
-    prev_runs_files = None
 
-    print_queue = multiprocessing.JoinableQueue(102400)
-    printing_thread = multiprocessing.Process(target=threaded_print, args=(print_queue,))
-    printing_thread.start()
+    # print_queue = multiprocessing.JoinableQueue(102400)
+    # printing_thread = multiprocessing.Process(target=threaded_print, args=(print_queue,))
+    # printing_thread.start()
+    print_queue = None
 
     db_input_queue = multiprocessing.JoinableQueue(102400)
     db_input_thread = multiprocessing.Process(target=threaded_db_input, args=(db_input_queue, tot_seeds,))
     db_input_thread.start()
 
     # no need in the next queues. Maybe helpful if working with /dev/shm
-    copy_queue = None
+    # copy_queue = None
     # copy_queue = multiprocessing.Queue()
     # copy_thread = multiprocessing.Process(target=threaded_copy, args=(copy_queue,))
     # copy_thread.start()
 
-    rm_queue = None
+    # rm_queue = None
     # rm_queue = multiprocessing.JoinableQueue(3)
     # rm_thread = multiprocessing.Process(target=threaded_rm, args=(rm_queue,))
     # rm_thread.start()
 
-    GMDA_main(prev_runs_files, past_dir, print_queue, db_input_queue, copy_queue, rm_queue, tot_seeds)
+    GMDA_main(past_dir, print_queue, db_input_queue, tot_seeds)
+    # GMDA_main(prev_runs_files, past_dir, print_queue, db_input_queue, copy_queue, rm_queue, tot_seeds)
 
-    printing_thread.join()
-    db_input_thread.join()
     print_queue.put_nowait(None)
     db_input_queue.put_nowait(None)
-    rm_queue.put_nowait(None)
+    printing_thread.join()
+    db_input_thread.join()
+    print('The last line of the program.')
+    # rm_queue.put_nowait(None)
     # print_queue.join()
     # db_input_queue.join()
     # rm_queue.join()

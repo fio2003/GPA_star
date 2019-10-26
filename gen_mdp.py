@@ -29,7 +29,7 @@ ld-seed     = {2:d}     ; \n\
 ; Output control\n\
 nstxout		= 0  	; save coordinates every 0.0 ps\n\
 nstvout		= 0		; save velocities every 0.0 ps\n\
-nstenergy	= 10000 ; save energies every 0.0 ps\n\
+nstenergy	= 0 ; save energies every 0.0 ps\n\
 nstlog		= 0		; update log file every 0.0 ps\n\
 nstxout-compressed	= 10000	; save coordinates every 0.0 ps\n\
 energygrps  = Protein SOL\n\

@@ -11,7 +11,7 @@ import os
 import multiprocessing as mp
 import hashlib
 from shutil import copy2 as cp2
-import heapq
+# import heapq
 import shutil
 import pickle
 
@@ -102,7 +102,7 @@ def get_previous_runs_info(check_dir: str) -> list:
     return filenames_found_important
 
 
-def check_precomputed_noize(an_file: str, metr_order: list):
+def check_precomputed_noize(an_file: str):
     """Checks whether file with precomputed ambient noise exists.
 
     Tries to read correct number of metrics, in case of error throws and exception
@@ -116,16 +116,15 @@ def check_precomputed_noize(an_file: str, metr_order: list):
         :return: dict{metric_name: noise_value}
         :rtype: dict or None
     """
-    # TODO: rewrite function to save noise and metric name, so you do not read the wrong sequence (add a check)
     if an_file in os.walk(".").__next__()[2]:
         print(an_file, ' was found. Reading... ')
         with open(an_file, 'r') as f:
             noize_arr = f.readlines()
         try:
-            res_arr = [float(res.strip()) for res in noize_arr]
+            res_arr = [res.strip().split(' : ') for res in noize_arr]
             err_node = dict()
-            for i in range(len(res_arr)):
-                err_node[metr_order[i]] = res_arr[i]
+            for metr, val in res_arr:
+                err_node[metr.strip()] = float(val.strip())
         except Exception as e:
             print(e)
             return None
@@ -171,7 +170,7 @@ def make_a_step(work_dir: str, cur_seed: int, seed_dirs: dict, top_file: str, nd
 
 
 def make_a_step2(work_dir: str, cur_seed: int, seed_dirs: dict, top_file: str, ndx_file: str, seed_digest_filename: str,
-                 old_name_digest: str, past_dir: str, hostname: str, ncores: int) -> NoReturn:
+                 old_name_digest: str, past_dir: str, hostname: list, ncores: int) -> NoReturn:
     """Version for the case when you use cluster and have hostnames.
 
     Generates the actual MD simulation by first - setting the simulation with grommp,
@@ -187,8 +186,8 @@ def make_a_step2(work_dir: str, cur_seed: int, seed_dirs: dict, top_file: str, n
         :param str seed_digest_filename: digest for a current MD simulation, used to store files in the past
         :param str old_name_digest: digest for a prior MD simulation
         :param str past_dir: path to the directory with prior computations
-        :param str hostname: hostname to use for MD simulation
-        :param intncores: number of cores to use for this task
+        :param list hostname: hostname(s) to use for MD simulation
+        :param int ncores: number of cores to use for this task
     """
     # global extra_past
     old_name = os.path.join(past_dir, old_name_digest)
@@ -229,7 +228,7 @@ def make_a_step3(work_dir: str, cur_seed: int, seed_dirs: dict, top_file: str, n
     """
     # global extra_past
     old_name = os.path.join(past_dir, old_name_digest)
-    if not os.path.exists(old_name +'.gro'):
+    if not os.path.exists(old_name + '.gro'):
         # old_name = os.path.join(extra_past, old_name_digest)
         # if not os.path.exists(old_name + '.gro'):
         raise Exception("make_a_step3: did not find {} in {}".format(old_name_digest, past_dir))

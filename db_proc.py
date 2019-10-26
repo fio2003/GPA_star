@@ -49,9 +49,13 @@ def get_db_con(tot_seeds: int = 4) -> tuple:
     cur.execute("""CREATE TABLE main_storage (
         id               INTEGER   PRIMARY KEY AUTOINCREMENT,
 
-        rmsd_goal_dist   FLOAT    NOT NULL,
-        rmsd_prev_dist   FLOAT    NOT NULL,
-        rmsd_tot_dist    FLOAT    NOT NULL,
+        bbrmsd_goal_dist   FLOAT    NOT NULL,
+        bbrmsd_prev_dist   FLOAT    NOT NULL,
+        bbrmsd_tot_dist    FLOAT    NOT NULL,
+        
+        aarmsd_goal_dist   FLOAT    NOT NULL,
+        aarmsd_prev_dist   FLOAT    NOT NULL,
+        aarmsd_tot_dist    FLOAT    NOT NULL,
 
         angl_goal_dist   FLOAT    NOT NULL,
         angl_prev_dist   FLOAT    NOT NULL,
@@ -97,6 +101,7 @@ def get_db_con(tot_seeds: int = 4) -> tuple:
         cur_metr   CHAR(5), \
         gc         INTEGER , \
         mul        FLOAT, \
+        bsfrb      FLOAT, \
         bsfr        FLOAT, \
         bsfn        FLOAT, \
         bsfh        FLOAT, \
@@ -307,13 +312,14 @@ def insert_into_main_stor(con: lite.Connection, node_info: dict, curr_gc: int, d
     # con = lite.connect('results_8.sqlite3', timeout=300, check_same_thread=False, isolation_level=None)
     # qry = "INSERT OR IGNORE INTO main_storage(rmsd_goal_dist, rmsd_prev_dist, rmsd_tot_dist, angl_goal_dist,
     # angl_prev_dist, angl_tot_dist," \
-    qry = "INSERT INTO main_storage(rmsd_goal_dist, rmsd_prev_dist, rmsd_tot_dist, angl_goal_dist, angl_prev_dist, angl_tot_dist," \
+    qry = "INSERT INTO main_storage(bbrmsd_goal_dist, bbrmsd_prev_dist, bbrmsd_tot_dist, aarmsd_goal_dist, aarmsd_prev_dist, aarmsd_tot_dist, angl_goal_dist, angl_prev_dist, angl_tot_dist," \
           "                         andh_goal_dist, andh_prev_dist, andh_tot_dist, and_goal_dist, and_prev_dist, and_tot_dist," \
           "                         xor_goal_dist, xor_prev_dist, xor_tot_dist, curr_gc, hashed_name, name) " \
-          "VALUES (?, ?, ?, ?, ?, ?,   ?, ?, ?, ?, ?, ?,   ?, ?, ?, ?, ?, ?)"
+          "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,   ?, ?, ?, ?, ?, ?,   ?, ?, ?, ?, ?, ?)"
     cur = con.cursor()
     try:
-        cur.execute(qry, [str(elem) for elem in (node_info['RMSD_to_goal'], node_info['RMSD_from_prev'], node_info['RMSD_dist_total'],
+        cur.execute(qry, [str(elem) for elem in (node_info['BBRMSD_to_goal'], node_info['BBRMSD_from_prev'], node_info['BBRMSD_dist_total'],
+                          node_info['AARMSD_to_goal'], node_info['AARMSD_from_prev'], node_info['AARMSD_dist_total'],
                           node_info['ANGL_to_goal'], node_info['ANGL_from_prev'], node_info['ANGL_dist_total'],
                           node_info['AND_H_to_goal'], node_info['AND_H_from_prev'], node_info['AND_H_dist_total'],
                           node_info['AND_to_goal'], node_info['AND_from_prev'], node_info['AND_dist_total'],
@@ -385,13 +391,13 @@ def insert_into_log(con: lite.Connection, operation: str, hname: str, src: str, 
     dst = 'None' if dst == '' else dst
     nid = get_id_for_hash(con, hname)
     nid = 'None' if nid is None else nid
-    columns = 'operation, id, src, dst, cur_metr, bsfr, bsfn, bsfh, bsfa, bsfx, gc, mul, '
+    columns = 'operation, id, src, dst, cur_metr, bsfr, bsfrb, bsfn, bsfh, bsfa, bsfx, gc, mul, '
 
     if not isinstance(goal_arr, (list,)):  # short version for skip operation
         columns += 'dist_from_prev_1, dist_to_goal_1'
         final_str = ', '.join('"{}"'.format(elem) if isinstance(elem, str) else str(elem)
-                              for elem in (operation, nid, src, dst, cur_metr_name, bsf[0], bsf[1], bsf[2], bsf[3],
-                                           bsf[4], gc, mul, prev_arr, goal_arr))
+                              for elem in (operation, nid, src, dst, cur_metr_name, bsf["BBRMSD"], bsf["AARMSD"], bsf["ANGL"],
+                                           bsf["AND_H"], bsf["AND"], bsf["XOR"], gc, mul, prev_arr, goal_arr))
     else:
         nseeds = len(prev_arr)  # long version for append operation
         columns += ', '.join(('dist_from_prev_{0}'.format(i+1) for i in range(nseeds))) + ', '
@@ -399,7 +405,8 @@ def insert_into_log(con: lite.Connection, operation: str, hname: str, src: str, 
         prev_arr_str = ', '.join((str(elem) for elem in prev_arr))
         goal_arr_str = ', '.join((str(elem) for elem in goal_arr))
         final_str = ', '.join('"{}"'.format(elem) if isinstance(elem, str) else str(elem)
-                              for elem in (operation, nid, src, dst, cur_metr_name, bsf[0], bsf[1], bsf[2], bsf[3], bsf[4], gc, mul))
+                              for elem in (operation, nid, src, dst, cur_metr_name, bsf["BBRMSD"], bsf["AARMSD"], bsf["ANGL"],
+                                           bsf["AND_H"], bsf["AND"], bsf["XOR"], gc, mul))
         final_str += ", ".join(('', prev_arr_str, goal_arr_str))
 
     qry = 'INSERT INTO log({}) VALUES ({})'.format(columns, final_str)

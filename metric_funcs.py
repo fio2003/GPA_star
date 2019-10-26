@@ -28,7 +28,8 @@ def get_knn_dist_mdsctk(ref_file: str, fitfile: str, topology: str) -> list:
 
     Args:
         :param str ref_file: reference file - .xtc or .gro filename
-        :param str fitfile: .xtc or .gro filename - structure will be centered according to the fitfile and used in distance computation
+        :param str fitfile: .xtc or .gro filename - structure will be centered
+         according to the fitfile and used in distance computation
         :param str topology: .top topology file of the simulation box
 
     Returns:
@@ -70,7 +71,7 @@ def get_contat_profile_mdsctk(ref_file: str, fitfile: str, index: str, dist: flo
         :param str fitfile: .xtc or .gro filename - structure will be centered according
          to the fitfile and used in distance computation
         :param str index: .ndx file to compute distance among particular atoms
-        :param floatdist: in Angstroms - how close should two atoms be, so treat them as a contact
+        :param float dist: in Angstroms - how close should two atoms be, so treat them as a contact
 
     Returns:
         :return: ndarray, first value - number of indices with contacts, next N indices are atoms with contact
@@ -200,7 +201,7 @@ def gen_file_for_amb_noize(work_dir: str, seeds: int, seed_dirs: dict, ndx_file:
         :param str top_file: .top topology file of the simulation box
         :param str goal_file: goal (typically NMR) conformation
         :param list hostnames: for MPI, to perform parallel computation
-        :param listcpu_map: number of cores for particular task (seed)
+        :param list cpu_map: number of cores for particular task (seed)
 
     Returns:
         :return: filename which contains all seed simulations concatenated
@@ -273,36 +274,22 @@ def gen_file_for_amb_noize(work_dir: str, seeds: int, seed_dirs: dict, ndx_file:
 #     return float(np.min(res_arr)*mul)
 
 
-def compute_phipsi_angles(angl_num: int, target_filename: str, ndx: str, stor_name: str = None) -> np.ndarray:
+def compute_phipsi_angles(angl_num: int, target_filename: str) -> np.ndarray:
     """Top level function that outputs sin/cos of the dihedral angles of the provided conformation.
 
     Args:
         :param int angl_num: total number of angles in the protein
         :param str target_filename:
-        :param str ndx: index file to extract only specific atoms (extract the backbone)
-        :param str stor_name:
 
     Returns:
         :return: array with sin/cos values of the backbone angles.
         :rtype: np.ndarray
     """
-    xtc_filename = "{}.xtc".format(target_filename)
-    if stor_name is None:  # then create temp file in /dev/shm
-        bb_filename = "{}_bb.xtc".format(target_filename)
-        ang_filename = "{}_bb.ang".format(target_filename)
-        sin_cos_filename = "{}_bb.sc".format(target_filename)
-        # making sure that we do not reuse old files
-        if os.path.exists(bb_filename):
-            os.remove(bb_filename)
-        if os.path.exists(bb_filename):
-            os.remove(bb_filename)
-    else:  # then store in ./past/
-        bb_filename = "{}_bb.xtc".format(stor_name)
-        ang_filename = "{}_bb.ang".format(stor_name)
-        sin_cos_filename = "{}_bb.sc".format(stor_name)
 
-    gmx_trjconv(f=xtc_filename, o=bb_filename, n=ndx)
-    get_bb_to_angle_mdsctk(x=bb_filename, o=ang_filename)
+    ang_filename = "{}_bb.ang".format(target_filename)
+    sin_cos_filename = "{}_bb.sc".format(target_filename)
+
+    get_bb_to_angle_mdsctk(x=target_filename, o=ang_filename)
     get_angle_to_sincos_mdsctk(i=ang_filename, o=sin_cos_filename)
 
     with open(sin_cos_filename, 'rb') as file:
@@ -313,12 +300,12 @@ def compute_phipsi_angles(angl_num: int, target_filename: str, ndx: str, stor_na
     return check_arr
 
 
-def ang_dist(target_ang: list, goal_ang: list) -> np.ndarray:
+def ang_dist(target_ang: np.ndarray, goal_ang: np.ndarray) -> np.ndarray:
     """Computes difference between two angle lists.
 
     Args:
-        :param list target_ang: angles to test
-        :param list goal_ang: goal angles
+        :param np.ndarray target_ang: angles to test
+        :param np.ndarray goal_ang: goal angles
 
     Returns:
         :return: one number when input is a list or list of sums in case intput is list of lists
@@ -356,7 +343,7 @@ def save_an_file(an_file_name: str, tol_error: dict, metr_order: list) -> NoRetu
     """
     with open(an_file_name, 'w') as f:
         for metr_name in metr_order:
-            f.write('{}\n'.format(tol_error[metr_name]))
+            f.write('{} : {}\n'.format(metr_name, tol_error[metr_name]))
 
 
 def get_native_contacts(goal_prot_only: str, files_to_check: list, ndx_file: str, cont_corr: np.ndarray, atom_num: int,
@@ -494,7 +481,7 @@ def rmsd(q: mp.Queue, combined_pg: str, temp_xtc_file: str, goal_prot_only: str,
         :param str combined_pg: two frames previous and goal
         :param str temp_xtc_file: new frames (same as number of seeds) you want to measure distance from previous and to the goal
         :param str goal_prot_only: goal protein only conformation
-        :param np.float64 rev_tot_dist: distance accumulated from the origin
+        :param np.float64 prev_tot_dist: distance accumulated from the origin
 
     Returns:
         :return: Returns by putting into the queue (metric to goal, metric from previous, total traveled in metric units).
@@ -530,10 +517,11 @@ def angl(q: mp.Queue, angl_num: int, temp_xtc_file: str, init_bb_ndx: str, pangl
     q.put((angl_sum_to_goal, angl_sum_from_prev, angl_sum_tot, cur_angles))
 
 
-def compute_metric(past_dir: str, new_nodes_names: list, tot_seeds: int, combined_pg: str, temp_xtc_file: str, goal_prot_only: str, node_info: dict, angl_num: int,
-                   init_bb_ndx: str, goal_angles: list, init_prot_only: str, files_for_trjcat: list, ndx_file_init: str, goal_cont_h: list, atom_num: int,
-                   cont_dist: float, h_filter_init: list, goal_contacts: list, cur_metric: int, goal_contacts_and_h_sum: np.int, goal_contacts_and_sum: np.int,
-                   chance_to_reuse: bool = False, cpu_pool: mp.Pool = None, compute_all_at_once: bool = True) -> list:
+def compute_metric(past_dir: str, new_nodes_names: list, tot_seeds: int, combined_pg: str, combined_pg_bb: str, temp_xtc_file: str,
+                   temp_xtc_file_bb: str, node_info: dict, angl_num: int, goal_angles: list, init_prot_only: str,
+                   files_for_trjcat: list, ndx_file_init: str, goal_cont_h: list, atom_num: int, cont_dist: float, h_filter_init: list,
+                   goal_contacts: list, cur_metric: int, goal_contacts_and_h_sum: np.int, goal_contacts_and_sum: np.int,
+                   goal_conf_files: dict, cpu_pool: mp.Pool = None, compute_all_at_once: bool = True) -> list:
     """Computes metric distances from the previous node and to the goal (NMR) conformation.
 
     Before I was computing metrics separately, but computing them all at once add very little overhead
@@ -544,11 +532,11 @@ def compute_metric(past_dir: str, new_nodes_names: list, tot_seeds: int, combine
         :param list new_nodes_names: full names of newly computed nodes (not current)
         :param int tot_seeds: total number of seed in the current run
         :param str combined_pg: previous and goal frames combined into one trajectory
+        :param str combined_pg_bb: previous and goal frames combined into one trajectory (backbone only)
+        :param str temp_xtc_file_bb: new nodes' final frames (backbone only)
         :param str temp_xtc_file: new nodes' final frames
-        :param str goal_prot_only: NMR (folded) conformation without water and salt (protein only)
         :param dict node_info: info about the current node (not just computed, but rather previous)
         :param int angl_num: number of dihedral angles in the protein
-        :param str init_bb_ndx: index file with backbone atom positions for the initial conformation
         :param list goal_angles: angle values of the NMR structure
         :param str init_prot_only: initial (unfolded) conformation without water and salt (protein only)
         :param list files_for_trjcat: list of newly computed nodes (files, with hash as a name)
@@ -561,7 +549,7 @@ def compute_metric(past_dir: str, new_nodes_names: list, tot_seeds: int, combine
         :param int cur_metric: metric index
         :param np.int goal_contacts_and_h_sum: total sum of the contacts between hydrogents in the NMR (folded) conformation
         :param np.int goal_contacts_and_sum: total sum of the contacts in the NMR (folded) conformation
-        :param bool chance_to_reuse:
+        :param dict goal_conf_files: list of all goal files - to reduce number of passed variables
         :param mp.Pool cpu_pool: CPU pool for local parallel processing
         :param bool compute_all_at_once: toggle whether to compute all metrics at the same time or not (yes, if no check the code)
 
@@ -569,7 +557,6 @@ def compute_metric(past_dir: str, new_nodes_names: list, tot_seeds: int, combine
         :return: new nodes with all metrics (compute_all_at_once only) and current metric distances
         :rtype: list
     """
-    # global extra_past
     new_nodes = [None] * tot_seeds
     # prev_contacts = node_info['contacts']
     try:
@@ -636,13 +623,19 @@ def compute_metric(past_dir: str, new_nodes_names: list, tot_seeds: int, combine
         # pid.join()
         # angl_sum_to_goal, angl_sum_from_prev, angl_sum_tot, cur_angles = q[3].get()
 
-        # *********  RMSD ************
-        dist_arr = get_knn_dist_mdsctk(combined_pg, temp_xtc_file, goal_prot_only)
-        from_prev_dist = dist_arr[0::2]
-        rmsd_to_goal = dist_arr[1::2]
-        rmsd_total_trav = [node_info['RMSD_dist_total'] + elem for elem in from_prev_dist]
+        # *********  AARMSD ************
+        dist_arr = get_knn_dist_mdsctk(combined_pg, temp_xtc_file, goal_conf_files["goal_prot_only_gro"])
+        from_prev_dist_aa = dist_arr[0::2]
+        rmsd_to_goal_aa = dist_arr[1::2]
+        rmsd_total_trav_aa = [node_info['AARMSD_dist_total'] + elem for elem in from_prev_dist_aa]
 
-        # *********  ANG ************
+        # *********  BBRMSD ************
+        dist_arr = get_knn_dist_mdsctk(combined_pg_bb, temp_xtc_file_bb, goal_conf_files["goal_bb_only_gro"])
+        from_prev_dist_bb = dist_arr[0::2]
+        rmsd_to_goal_bb = dist_arr[1::2]
+        rmsd_total_trav_bb = [node_info['BBRMSD_dist_total'] + elem for elem in from_prev_dist_bb]
+
+        # *********  ANGL ************
         reusing_old_angl = False
         # if chance_to_reuse:
         try:
@@ -650,7 +643,7 @@ def compute_metric(past_dir: str, new_nodes_names: list, tot_seeds: int, combine
             cur_angles = np.asarray(cur_angles, dtype=np.float32)
             reusing_old_angl = True
         except OSError:
-            cur_angles = compute_phipsi_angles(angl_num, temp_xtc_file.split('.')[0], init_bb_ndx)
+            cur_angles = compute_phipsi_angles(angl_num, temp_xtc_file_bb)
         # else:
         #     cur_angles = compute_phipsi_angles(angl_num, temp_xtc_file.split('.')[0], init_bb_ndx)
 
@@ -697,9 +690,13 @@ def compute_metric(past_dir: str, new_nodes_names: list, tot_seeds: int, combine
             new_nodes[i] = dict()
             new_nodes[i]['digest_name'] = get_digest(new_nodes_names[i])
 
-            new_nodes[i]['RMSD_to_goal'] = np.float32(rmsd_to_goal[i])
-            new_nodes[i]['RMSD_from_prev'] = np.float32(from_prev_dist[i])
-            new_nodes[i]['RMSD_dist_total'] = np.float32(rmsd_total_trav[i])
+            new_nodes[i]['BBRMSD_to_goal'] = np.float32(rmsd_to_goal_bb[i])
+            new_nodes[i]['BBRMSD_from_prev'] = np.float32(from_prev_dist_bb[i])
+            new_nodes[i]['BBRMSD_dist_total'] = np.float32(rmsd_total_trav_bb[i])
+
+            new_nodes[i]['AARMSD_to_goal'] = np.float32(rmsd_to_goal_aa[i])
+            new_nodes[i]['AARMSD_from_prev'] = np.float32(from_prev_dist_aa[i])
+            new_nodes[i]['AARMSD_dist_total'] = np.float32(rmsd_total_trav_aa[i])
 
             new_nodes[i]['ANGL_to_goal'] = np.float32(angl_sum_to_goal[i])
             new_nodes[i]['ANGL_from_prev'] = np.float32(angl_sum_from_prev[i])
@@ -728,7 +725,7 @@ def compute_metric(past_dir: str, new_nodes_names: list, tot_seeds: int, combine
                 cur_angles[i].astype('float32').tofile(os.path.join(past_dir, '{}.angl'.format(new_nodes[i]['digest_name'])))
 
         if cur_metric == 0:
-            return new_nodes, rmsd_to_goal, from_prev_dist, rmsd_total_trav
+            return new_nodes, rmsd_to_goal_aa, from_prev_dist_aa, rmsd_total_trav_bb
         elif cur_metric == 1:
             return new_nodes, angl_sum_to_goal, angl_sum_from_prev, angl_sum_tot
         elif cur_metric == 2:
@@ -746,91 +743,91 @@ def compute_metric(past_dir: str, new_nodes_names: list, tot_seeds: int, combine
         else:
             raise Exception('Unknown metric')
     else:  # This version is outdated. Using one metric does not produce significant speedup
-        if cur_metric == 0:  # RMSD
-            dist_arr = get_knn_dist_mdsctk(combined_pg, temp_xtc_file, goal_prot_only)
-            # TODO: fix rm files and check if other files has to be removed
-            # rm_queue.put_nowait(combined_pg)
-            # rm_queue.put_nowait(temp_xtc_file)
-            # since combined_pg had two points we have to divide result into two arrays
-            from_prev_dist = dist_arr[0::2]
-            rmsd_to_goal = dist_arr[1::2]
-            rmsd_total_trav = [node_info['RMSD_dist_total'] + elem for elem in from_prev_dist]
-            for i in range(tot_seeds):
-                new_nodes[i]['RMSD_to_goal'] = rmsd_to_goal[i]
-                new_nodes[i]['RMSD_from_prev'] = from_prev_dist[i]
-                new_nodes[i]['RMSD_dist_total'] = rmsd_total_trav[i]
-
-            return new_nodes, rmsd_to_goal, from_prev_dist, rmsd_total_trav
-
-        elif cur_metric == 1:  # PhyPsi
-            cur_angles = compute_phipsi_angles(angl_num, temp_xtc_file.split('.')[0], init_bb_ndx)
-            angl_sum_from_prev = ang_dist(cur_angles, node_info['angles'])
-            angl_sum_to_goal = ang_dist(cur_angles, goal_angles)
-            angl_sum_tot = node_info['ANG_dist_total'] + angl_sum_from_prev
-            for i in range(tot_seeds):
-                new_nodes[i]['ANGL_to_goal'] = angl_sum_to_goal[i]
-                new_nodes[i]['ANGL_from_prev'] = angl_sum_from_prev[i]
-                new_nodes[i]['ANGL_dist_total'] = angl_sum_tot[i]
-                new_nodes[i]['angles'] = cur_angles[i]
-
-            return new_nodes, angl_sum_to_goal, angl_sum_from_prev, angl_sum_tot
-
-        elif cur_metric == 2:  # AND_H
-            contacts = get_native_contacts(init_prot_only, files_for_trjcat, ndx_file_init, goal_contacts,
-                                           atom_num, cont_dist, np.logical_and, pool=cpu_pool)[1]
-            # although it is possible to get h_contacts from the get_native_contacts, then I'll not be able to get pure contacts to store
-            contacts_h = [np.logical_and(arr_elem, h_filter_init) for arr_elem in contacts]
-            goal_cont_dist_and_h = [np.logical_and(arr_elem, goal_cont_h).sum() for arr_elem in contacts_h]
-            prev_contacts_h = np.logical_and(prev_contacts.toarray(), h_filter_init)
-            prev_cont_dist_and_h_1 = [np.logical_xor(arr_elem, prev_contacts_h).sum() for arr_elem in contacts_h]
-            prev_cont_dist_and_h_2 = [arr_elem.sum() for arr_elem in contacts_h] + prev_contacts_h.sum()
-            prev_cont_dist_and_h_2 = prev_cont_dist_and_h_2 / 2 - \
-                [elem.sum() for elem in [np.logical_and(arr_elem, prev_contacts_h) for arr_elem in contacts_h]]
-            total_cont_dist_and_h = node_info['AND_H_dist_total'] + prev_cont_dist_and_h_1
-            for i in range(tot_seeds):
-                new_nodes[i]['AND_H_to_goal'] = goal_cont_dist_and_h[i]
-                new_nodes[i]['AND_H_from_prev'] = prev_cont_dist_and_h_1[i]
-                new_nodes[i]['AND_H_dist_total'] = total_cont_dist_and_h[i]
-                new_nodes[i]['contacts'] = csc_matrix(contacts[i])
-
-            return new_nodes, goal_cont_dist_and_h, prev_cont_dist_and_h_1, total_cont_dist_and_h
-
-        elif cur_metric == 3:  # AND
-            goal_cont_dist_and, contacts = get_native_contacts(init_prot_only, files_for_trjcat, ndx_file_init, goal_contacts,
-                                                               atom_num, cont_dist, np.logical_and, pool=cpu_pool)
-            prev_cont_dist_and_1 = [np.logical_xor(arr_elem, prev_contacts.toarray()).sum() for arr_elem in contacts]
-            prev_cont_dist_and_2 = [arr_elem.sum() for arr_elem in contacts] + prev_contacts.sum()
-            prev_cont_dist_and_2 = prev_cont_dist_and_2 / 2 - \
-                [elem.sum() for elem in [np.logical_and(arr_elem, prev_contacts.toarray()) for arr_elem in contacts]]
-            total_cont_dist_and = node_info['AND_dist_total'] + prev_cont_dist_and_1
-            for i in range(tot_seeds):
-                new_nodes[i]['AND_to_goal'] = goal_cont_dist_and[i]
-                new_nodes[i]['AND_from_prev'] = prev_cont_dist_and_1[i]
-                new_nodes[i]['AND_dist_total'] = total_cont_dist_and[i]
-                new_nodes[i]['contacts'] = csc_matrix(contacts[i])
-
-            return new_nodes, goal_cont_dist_and, prev_cont_dist_and_1, total_cont_dist_and
-
-        elif cur_metric == 4:  # XOR
-            goal_cont_dist_xor, contacts = get_native_contacts(init_prot_only, files_for_trjcat, ndx_file_init, goal_contacts,
-                                                               atom_num, cont_dist, np.logical_xor, pool=cpu_pool)
-            prev_cont_dist_sum_xor = [np.logical_xor(arr_elem, prev_contacts.toarray()).sum() for arr_elem in contacts]
-            total_cont_dist_xor = node_info['XOR_dist_total'] + prev_cont_dist_sum_xor
-            for i in range(tot_seeds):
-                new_nodes[i]['XOR_to_goal'] = goal_cont_dist_xor[i]
-                new_nodes[i]['XOR_from_prev'] = prev_cont_dist_sum_xor[i]
-                new_nodes[i]['XOR_dist_total'] = total_cont_dist_xor[i]
-                new_nodes[i]['contacts'] = csc_matrix(contacts[i])
-
-            return new_nodes, goal_cont_dist_xor, prev_cont_dist_sum_xor, total_cont_dist_xor
-
+        raise Exception('Why would you use separate metrics ? If you are sure - review the code and add BBRMSD!')
+    #     if cur_metric == 0:  # RMSD
+    #         dist_arr = get_knn_dist_mdsctk(combined_pg, temp_xtc_file, goal_prot_only)
+    #         # TODO: fix rm files and check if other files has to be removed
+    #         # rm_queue.put_nowait(combined_pg)
+    #         # rm_queue.put_nowait(temp_xtc_file)
+    #         # since combined_pg had two points we have to divide result into two arrays
+    #         from_prev_dist = dist_arr[0::2]
+    #         rmsd_to_goal = dist_arr[1::2]
+    #         rmsd_total_trav = [node_info['RMSD_dist_total'] + elem for elem in from_prev_dist]
+    #         for i in range(tot_seeds):
+    #             new_nodes[i]['RMSD_to_goal'] = rmsd_to_goal[i]
+    #             new_nodes[i]['RMSD_from_prev'] = from_prev_dist[i]
+    #             new_nodes[i]['RMSD_dist_total'] = rmsd_total_trav[i]
+    #
+    #         return new_nodes, rmsd_to_goal, from_prev_dist, rmsd_total_trav
+    #
+    #     elif cur_metric == 1:  # PhyPsi
+    #         cur_angles = compute_phipsi_angles(angl_num, temp_xtc_file.split('.')[0], init_bb_ndx)
+    #         angl_sum_from_prev = ang_dist(cur_angles, node_info['angles'])
+    #         angl_sum_to_goal = ang_dist(cur_angles, goal_angles)
+    #         angl_sum_tot = node_info['ANG_dist_total'] + angl_sum_from_prev
+    #         for i in range(tot_seeds):
+    #             new_nodes[i]['ANGL_to_goal'] = angl_sum_to_goal[i]
+    #             new_nodes[i]['ANGL_from_prev'] = angl_sum_from_prev[i]
+    #             new_nodes[i]['ANGL_dist_total'] = angl_sum_tot[i]
+    #             new_nodes[i]['angles'] = cur_angles[i]
+    #
+    #         return new_nodes, angl_sum_to_goal, angl_sum_from_prev, angl_sum_tot
+    #
+    #     elif cur_metric == 2:  # AND_H
+    #         contacts = get_native_contacts(init_prot_only, files_for_trjcat, ndx_file_init, goal_contacts,
+    #                                        atom_num, cont_dist, np.logical_and, pool=cpu_pool)[1]
+    #         # although it is possible to get h_contacts from the get_native_contacts, then I'll not be able to get pure contacts to store
+    #         contacts_h = [np.logical_and(arr_elem, h_filter_init) for arr_elem in contacts]
+    #         goal_cont_dist_and_h = [np.logical_and(arr_elem, goal_cont_h).sum() for arr_elem in contacts_h]
+    #         prev_contacts_h = np.logical_and(prev_contacts.toarray(), h_filter_init)
+    #         prev_cont_dist_and_h_1 = [np.logical_xor(arr_elem, prev_contacts_h).sum() for arr_elem in contacts_h]
+    #         prev_cont_dist_and_h_2 = [arr_elem.sum() for arr_elem in contacts_h] + prev_contacts_h.sum()
+    #         prev_cont_dist_and_h_2 = prev_cont_dist_and_h_2 / 2 - \
+    #             [elem.sum() for elem in [np.logical_and(arr_elem, prev_contacts_h) for arr_elem in contacts_h]]
+    #         total_cont_dist_and_h = node_info['AND_H_dist_total'] + prev_cont_dist_and_h_1
+    #         for i in range(tot_seeds):
+    #             new_nodes[i]['AND_H_to_goal'] = goal_cont_dist_and_h[i]
+    #             new_nodes[i]['AND_H_from_prev'] = prev_cont_dist_and_h_1[i]
+    #             new_nodes[i]['AND_H_dist_total'] = total_cont_dist_and_h[i]
+    #             new_nodes[i]['contacts'] = csc_matrix(contacts[i])
+    #
+    #         return new_nodes, goal_cont_dist_and_h, prev_cont_dist_and_h_1, total_cont_dist_and_h
+    #
+    #     elif cur_metric == 3:  # AND
+    #         goal_cont_dist_and, contacts = get_native_contacts(init_prot_only, files_for_trjcat, ndx_file_init, goal_contacts,
+    #                                                            atom_num, cont_dist, np.logical_and, pool=cpu_pool)
+    #         prev_cont_dist_and_1 = [np.logical_xor(arr_elem, prev_contacts.toarray()).sum() for arr_elem in contacts]
+    #         prev_cont_dist_and_2 = [arr_elem.sum() for arr_elem in contacts] + prev_contacts.sum()
+    #         prev_cont_dist_and_2 = prev_cont_dist_and_2 / 2 - \
+    #             [elem.sum() for elem in [np.logical_and(arr_elem, prev_contacts.toarray()) for arr_elem in contacts]]
+    #         total_cont_dist_and = node_info['AND_dist_total'] + prev_cont_dist_and_1
+    #         for i in range(tot_seeds):
+    #             new_nodes[i]['AND_to_goal'] = goal_cont_dist_and[i]
+    #             new_nodes[i]['AND_from_prev'] = prev_cont_dist_and_1[i]
+    #             new_nodes[i]['AND_dist_total'] = total_cont_dist_and[i]
+    #             new_nodes[i]['contacts'] = csc_matrix(contacts[i])
+    #
+    #         return new_nodes, goal_cont_dist_and, prev_cont_dist_and_1, total_cont_dist_and
+    #
+    #     elif cur_metric == 4:  # XOR
+    #         goal_cont_dist_xor, contacts = get_native_contacts(init_prot_only, files_for_trjcat, ndx_file_init, goal_contacts,
+    #                                                            atom_num, cont_dist, np.logical_xor, pool=cpu_pool)
+    #         prev_cont_dist_sum_xor = [np.logical_xor(arr_elem, prev_contacts.toarray()).sum() for arr_elem in contacts]
+    #         total_cont_dist_xor = node_info['XOR_dist_total'] + prev_cont_dist_sum_xor
+    #         for i in range(tot_seeds):
+    #             new_nodes[i]['XOR_to_goal'] = goal_cont_dist_xor[i]
+    #             new_nodes[i]['XOR_from_prev'] = prev_cont_dist_sum_xor[i]
+    #             new_nodes[i]['XOR_dist_total'] = total_cont_dist_xor[i]
+    #             new_nodes[i]['contacts'] = csc_matrix(contacts[i])
+    #
+    #         return new_nodes, goal_cont_dist_xor, prev_cont_dist_sum_xor, total_cont_dist_xor
     raise Exception("You cant be here")
 
 
-def compute_init_metric(past_dir: str, tot_seeds: int, init_xtc: str, goal_xtc: str, goal_prot_only: str, angl_num: int,
-                        init_bb_ndx: str, goal_angles: np.ndarray, init_prot_only: str, ndx_file_init: str,
-                        goal_cont_h: np.ndarray, atom_num: int, cont_dist: float, h_filter_init: np.ndarray,
-                        goal_contacts: np.ndarray, goal_contacts_and_h_sum: np.int64, goal_contacts_and_sum: np.int64) -> list:
+def compute_init_metric(past_dir: str, tot_seeds: int, init_xtc: str, init_xtc_bb: str, angl_num: int, goal_angles: np.ndarray,
+                        init_prot_only: str, ndx_file_init: str, goal_cont_h: np.ndarray, atom_num: int, cont_dist: float,
+                        h_filter_init: np.ndarray, goal_contacts: np.ndarray, goal_contacts_and_h_sum: np.int64,
+                        goal_contacts_and_sum: np.int64, goal_conf_files: dict) -> list:
     """Special case of the "compute_metric"
 
     Computes metric distances to the goal (NMR) conformation and sets previous distances to 0
@@ -839,10 +836,8 @@ def compute_init_metric(past_dir: str, tot_seeds: int, init_xtc: str, goal_xtc: 
         :param str past_dir: path to the directory with prior computation results
         :param int tot_seeds: total number of seed in the current run
         :param str init_xtc: initial (unfolded) conformation with water and salt
-        :paramstr  goal_xtc: NMR (folded) conformation with water and salt
-        :param str goal_prot_only: NMR (folded) conformation without water and salt (protein only)
+        :param str init_xtc_bb: initial (unfolded) conformation with water and salt backbone only
         :param int angl_num: number of dihedral angles in the protein
-        :param str init_bb_ndx: index file with backbone atom positions for the initial conformation
         :param np.ndarray goal_angles: angle values of the NMR structure
         :param str init_prot_only: initial (unfolded) conformation without water and salt (protein only)
         :param str ndx_file_init: index file with backbone atom positions for the NMR conformation
@@ -851,8 +846,9 @@ def compute_init_metric(past_dir: str, tot_seeds: int, init_xtc: str, goal_xtc: 
         :param float cont_dist: distance between atoms treated as 'contact'
         :param np.ndarray h_filter_init: positions of the hydrogen atoms in the initial (unfolded) conformation
         :param np.ndarray goal_contacts: list of correct contacts in the NMR (folded) conformation
-        :param np.int64 goal_contacts_and_h_sum: total sum of the contacts between hydrogents in the NMR (folded) conformation
+        :param np.int64 goal_contacts_and_h_sum: total sum of the contacts between hydrogens in the NMR (folded) conformation
         :param np.int64 goal_contacts_and_sum: total sum of the contacts in the NMR (folded) conformation
+        :param goal_conf_files: list of all goal files - to reduce number of passed variables
 
     Returns:
         :return: node structure with the initial metrics
@@ -860,10 +856,13 @@ def compute_init_metric(past_dir: str, tot_seeds: int, init_xtc: str, goal_xtc: 
     """
     init_node = [None] * tot_seeds
     dim = 1 if tot_seeds > 1 else 0
-    # *********  RMSD ************
-    rmsd_to_goal = get_knn_dist_mdsctk(init_xtc, goal_xtc, goal_prot_only)
+    # *********  AARMSD ************
+    aarmsd_to_goal = get_knn_dist_mdsctk(init_xtc, goal_conf_files["goal_prot_only_xtc"], goal_conf_files["goal_prot_only_gro"])
+
+    # *********  BBRMSD ************
+    bbrmsd_to_goal = get_knn_dist_mdsctk(init_xtc_bb, goal_conf_files["goal_bb_xtc"], goal_conf_files["goal_bb_only_gro"])
     # *********  ANG ************
-    cur_angles = compute_phipsi_angles(angl_num, init_xtc.split('.')[0], init_bb_ndx)
+    cur_angles = compute_phipsi_angles(angl_num, init_xtc_bb)
 
     angl_sum_to_goal = ang_dist(cur_angles, goal_angles)
 
@@ -891,9 +890,13 @@ def compute_init_metric(past_dir: str, tot_seeds: int, init_xtc: str, goal_xtc: 
         init_node[i] = dict()
         init_node[i]['digest_name'] = get_digest('s')
 
-        init_node[i]['RMSD_to_goal'] = np.float32(rmsd_to_goal[i])
-        init_node[i]['RMSD_from_prev'] = np.uint32(0)
-        init_node[i]['RMSD_dist_total'] = np.uint32(0)
+        init_node[i]['BBRMSD_to_goal'] = np.float32(bbrmsd_to_goal[i])
+        init_node[i]['BBRMSD_from_prev'] = np.uint32(0)
+        init_node[i]['BBRMSD_dist_total'] = np.uint32(0)
+
+        init_node[i]['AARMSD_to_goal'] = np.float32(aarmsd_to_goal[i])
+        init_node[i]['AARMSD_from_prev'] = np.uint32(0)
+        init_node[i]['AARMSD_dist_total'] = np.uint32(0)
 
         init_node[i]['ANGL_to_goal'] = np.float32(angl_sum_to_goal[i])
         init_node[i]['ANGL_from_prev'] = np.uint32(0)

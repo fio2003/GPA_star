@@ -240,7 +240,7 @@ def gmx_mdrun(work_dir: str, seed: int, new_name: str, ncores: int = multiproces
         print(error)
 
 
-def gmx_mdrun_mpi(work_dir: str, seed: int, new_name: str, hostnames: list, ncores: list = None, thread_type: str = 'ntomp') -> NoReturn:
+def gmx_mdrun_mpi(work_dir: str, seed: int, new_name: str, hostnames: list, ncores: int = None, thread_type: str = 'ntomp') -> NoReturn:
     """gmx mdrun - MPI version
 
     Args:
@@ -248,7 +248,7 @@ def gmx_mdrun_mpi(work_dir: str, seed: int, new_name: str, hostnames: list, ncor
         :param int seed: seed value used in the MD simulation
         :param str new_name: output name for a final state
         :param list hostnames: must be a list
-        :param list ncores: number of cores to use in the current simulation
+        :param int ncores: number of cores to use in the current simulation
         :param str thread_type: type of the thread, OMP ? MPI ?
 
     Returns:
